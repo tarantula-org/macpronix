@@ -29,7 +29,7 @@
 
   networking.hostName = "trashcan";
   
-  # NETWORK REFACTOR: IWD (Fixes Broadcom Drops)
+  # NETWORK REFACTOR: IWD
   networking.networkmanager = {
     enable = true;
     wifi.backend = "iwd";
@@ -68,14 +68,15 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   environment.systemPackages = with pkgs; [
+    # CORE UTILITIES
     git htop btop pciutils lm_sensors fastfetch neovim
+    gnumake  # <--- ADDED: Required for 'make' workflows
     
-    # INSTALL THE "MACPRONIX" CLI TOOL
-    # This reads the script from your local bin/ folder and makes it a system command
+    # CUSTOM CLI TOOL
     (pkgs.writeShellScriptBin "macpronix" (builtins.readFile ../../bin/macpronix))
   ];
 
-  # 4. EDITOR CONFIGURATION
+  # 4. EDITOR SUPREMACY
   # --------------------------------------------------
   environment.variables.EDITOR = "nvim";
   environment.variables.VISUAL = "nvim";
