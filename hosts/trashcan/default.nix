@@ -12,39 +12,40 @@
   nixpkgs.config.permittedInsecurePackages = [
     "broadcom-sta-6.30.223.271-59-6.12.67"
   ];
-  boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
-  boot.kernelModules = [ "wl" ];
-  boot.blacklistedKernelModules = [ "b43" "bcma" ];
 
-  # Fix Thermal Core (The Trashcan Fan Curve)
+  boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
+  boot.kernelModules = [ "wl" "applesmc" "coretemp" ];
+  boot.blacklistedKernelModules = [ "b43" "bcma" ];
+  boot.kernelParams = [ "radeon.dpm=0" ];
   services.mbpfan.enable = true;
-  services.mbpfan.settings = {
-    general = {
-      min_fan_speed = 2000; # Keep it breathing
-      max_fan_speed = 6000;
-      low_temp = 60;
-      high_temp = 85;
-    };
-  };
 
   # 2. SYSTEM ARCHITECTURE
   # --------------------------------------------------
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  
-  networking.hostName = "trashcan"; 
+
+  networking.hostName = "trashcan";
   networking.networkmanager.enable = true;
-  services.tailscale.enable = true; # Remote Access
+  networking.networkmanager.wifi.powersave = false;
+
+  # Remote Access (Tailscale) & Firewall Safety
+  services.tailscale.enable = true;
+  
+  networking.firewall = {
+    enable = true;
+    # TRUST TAILSCALE: This prevents "Connection Timed Out" on reboot
+    trustedInterfaces = [ "tailscale0" ];
+    allowedTCPPorts = [ 22 ];
+  };
 
   # Headless Access (SSH)
   services.openssh = {
     enable = true;
     settings = {
       PermitRootLogin = "no";
-      PasswordAuthentication = true; 
+      PasswordAuthentication = true;
     };
   };
-  networking.firewall.allowedTCPPorts = [ 22 ];
 
   # 3. MAINTENANCE & PACKAGES
   # --------------------------------------------------
@@ -53,13 +54,14 @@
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
+
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   environment.systemPackages = with pkgs; [
     vim git htop btop pciutils lm_sensors fastfetch
   ];
 
-  # 4. USER IDENTITY
+  # 4. USER IDENTITY (Default Admin)
   # --------------------------------------------------
   users.users.admin = {
     isNormalUser = true;
@@ -68,10 +70,24 @@
     packages = with pkgs; [];
   };
 
-  # 5. LOCALIZATION
+  # 5. LOCALIZATION (Server Standard)
   # --------------------------------------------------
-  time.timeZone = "Europe/Madrid";
+  # UTC is recommended for servers to keep logs consistent.
+  # Change to "Europe/Madrid" if you prefer local time.
+  time.timeZone = "UTC"; 
   i18n.defaultLocale = "en_US.UTF-8";
-  
-  system.stateVersion = "24.11"; 
+  system.stateVersion = "24.11";
+
+  # 6. GITHUB RUNNER (Tarantula Org)
+  # --------------------------------------------------
+  services.github-runners = {
+    trashcan-worker = {
+      enable = true;
+      # Points to the Organization root
+      url = "https://github.com/tarantula-org"; 
+      tokenFile = "/etc/secrets/github-runner-token";
+      replace = true;
+      extraPackages = with pkgs; [ git docker nodejs ];
+    };
+  };
 }
