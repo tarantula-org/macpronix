@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+#  MACPRONIX // CLUSTER CONTROLLER
+#  v2.1 "Neon Trashcan"
+# ==============================================================================
+
+# -- PALETTE --
+RED='\033[38;5;196m'
+GREEN='\033[38;5;46m'
+NEON='\033[38;5;51m'   # Cyan
+PURPLE='\033[38;5;93m' # Deep Purple
+PINK='\033[38;5;201m'
+GREY='\033[38;5;240m'
+NC='\033[0m'
+
+REPO_ROOT="$HOME/macpronix"
+RUNNER_CONFIG="$REPO_ROOT/hosts/trashcan/runner.nix"
+
+# -- VISUALS --
+
+banner() {
+    clear
+    echo -e "${PURPLE}"
+    # QUOTED HEREDOC: Preserves ASCII art structure
+    cat << "EOF"
+                                                    ---
+                                          ------------  -
+                                        -------==------------
+                                      --------====------------
+                                    ----------====-------------
+                                   ----------=====------------- -
+                                 ------------=====-----------------
+                                 -------------=====---------------
+                                ---------------===     ------------
+                               ----------------===      --------------
+                              --------------    ==         ---====----
+                               -------------     ==           =====-----
+                              ------------      ===          ======-----
+                              -----------      ====        =====-------
+                             ------------       ===        ===----------
+            ------==---          ===      ==== ----------
+                ------====-         ===      ====       ------
+                     -----======        ===   ======     --------
+                    -------=======             ====       --------
+          --------========             =         -------
+                ----------  ====     =====              --------
+                ----------     =    ======             --------
+                ---------           =====              -------
+                ----------          ======     ==        ------
+                --------            =====   ======      ------
+                --------             ====   ====== ==== ------
+                --------        ===  ===    ==============----
+            ---------      =====        =   ==========----
+           ----------    =======             =========----
+           -----------  =======     =           =====-----
+          ----------  ======       ==           ===-------
+           ---------- =======       ===            --------
+            ---------=======        ==             -------
+             --------=======       ===             -------
+          ---------====          ==            --------
+    -------- ===           ==          -------
+      ----------            ===        -------
+      ------------          ===        ---------
+       ------------         ====     ----------
+       -----------          ====   -----------
+       --------------        ====------------
+         -------------------=====------------
+         -------------------=====---------
+          -------------------==---------
+            -----------------------------
+              -------------------------
+               ----------------------
+                   --    -------
+EOF
+    echo -e "${NC}"
+    echo -e "   ${NEON}:: TRASHCAN CLUSTER CONTROLLER ::${NC}   ${GREY}v2.1${NC}"
+    echo ""
+}
+
+# -- LOGIC --
+
+cmd_status() {
+    banner
+    echo -e "${PINK}┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐${NC}"
+    
+    # 1. RUNNER CHECK
+    echo -n -e "${PINK}│${NC} Runner Node: "
+    if systemctl is-active --quiet github-runner-trashcan-worker; then
+        echo -e "${GREEN}● ONLINE${NC}"
+        CURRENT_ORG=$(grep 'url =' "$RUNNER_CONFIG" | cut -d '"' -f 2)
+        echo -e "${PINK}│${NC} Target Org:  ${NEON}$CURRENT_ORG${NC}"
+    else
+        echo -e "${RED}● OFFLINE${NC}"
+    fi
+
+    echo -e "${PINK}│${NC}"
+
+    # 2. NETWORK CHECK
+    echo -n -e "${PINK}│${NC} Tailscale:   "
+    TS_IP=$(tailscale ip -4 2>/dev/null)
+    if [ ! -z "$TS_IP" ]; then
+        echo -e "${GREEN}● ACTIVE${NC} ${GREY}($TS_IP)${NC}"
+    else
+        echo -e "${RED}● DISCONNECTED${NC}"
+    fi
+
+    # 3. WIFI CHECK
+    echo -n -e "${PINK}│${NC} Uplink:      "
+    LINK=$(iwctl station wlan0 show 2>/dev/null | grep "Connected network" | awk '{print $3}')
+    if [ ! -z "$LINK" ]; then
+        QUALITY=$(grep "wlan0" /proc/net/wireless | awk '{print int($3 * 100 / 70)}')
+        echo -e "${GREEN}● CONNECTED${NC} ${GREY}($LINK - ${QUALITY}% Signal)${NC}"
+    else
+         echo -e "${RED}● NO LINK${NC}"
+    fi
+    echo -e "${PINK}└───────────────────────────────────────────────────────────┘${NC}"
+    echo ""
+}
+
+cmd_set_org() {
+    NEW_URL=$1
+    if [ -z "$NEW_URL" ]; then
+        echo -e "${RED}Error: Usage macpronix set-org <URL>${NC}"
+        return
+    fi
+    echo -e "${NEON}:: RE-TARGETING CLUSTER ::${NC}"
+    echo -e "New Target: ${PURPLE}$NEW_URL${NC}"
+    sed -i "s|url = \".*\";|url = \"$NEW_URL\";|" "$RUNNER_CONFIG"
+    echo -e "${GREEN}✓ Configuration updated.${NC}"
+    echo -e "${GREY}Run 'macpronix sync' to apply changes.${NC}"
+}
+
+cmd_sync() {
+    echo -e "${NEON}:: INITIATING STATE SYNC ::${NC}"
+    cd "$REPO_ROOT"
+    echo -e "${GREY}[1/3] Pulling Manifests...${NC}"
+    git pull
+    echo -e "${GREY}[2/3] Resolving Dependencies...${NC}"
+    # No lockfile update by default for stability, use 'upgrade' for that
+    echo -e "${GREY}[3/3] Rebuilding System...${NC}"
+    sudo nixos-rebuild switch --flake .#trashcan
+    echo -e "${GREEN}✓ SYSTEM SYNCED${NC}"
+}
+
+cmd_upgrade() {
+    echo -e "${NEON}:: SYSTEM UPGRADE ::${NC}"
+    cd "$REPO_ROOT"
+    nix flake update
+    sudo nixos-rebuild switch --flake .#trashcan
+}
+
+cmd_help() {
+    banner
+    echo -e "Usage: ${NEON}macpronix${NC} [COMMAND]"
+    echo ""
+    echo -e "  ${PURPLE}status${NC}     Show dashboard telemetry and network health."
+    echo -e "  ${PURPLE}sync${NC}       Pull latest git changes and rebuild the system."
+    echo -e "  ${PURPLE}upgrade${NC}    Update flake inputs (lockfile) and rebuild."
+    echo -e "  ${PURPLE}edit${NC}       Open the configuration repository in Neovim."
+    echo -e "  ${PURPLE}set-org${NC}    Change the GitHub Organization target."
+    echo -e "  ${PURPLE}help${NC}       Show this help message."
+    echo ""
+}
+
+# -- ROUTER --
+
+case "$1" in
+    status) cmd_status ;;
+    sync) cmd_sync ;;
+    upgrade) cmd_upgrade ;;
+    set-org) cmd_set_org "$2" ;;
+    edit) cd "$REPO_ROOT"; nvim . ;;
+    help|--help|-h) cmd_help ;;
+    *) cmd_help ;;
+esac

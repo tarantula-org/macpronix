@@ -1,0 +1,27 @@
+name: System Anomaly
+description: Report a deviation from expected infrastructure state.
+title: "[FAULT]: "
+labels: ["fix", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **OPERATIONAL STOP.**
+        If this is a physical hardware failure (Thermal/GPU), tag it as `[HARDWARE]`.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Sequence of Events
+      description: Commands executed by the Operator.
+      placeholder: |
+        1. macpronix sync
+        2. Build fails at stage 2
+        3. Error: "Dependency conflict in flake.lock"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Telemetry / Logs
+      description: Output of `macpronix status` or `journalctl`.
+      render: shell

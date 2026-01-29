@@ -1,6 +1,10 @@
 { config, pkgs, pkgs-unstable, ... }:
 
 {
+  imports = [
+    ./runner.nix
+  ];
+
   # ==========================================
   # UNIVERSAL MAC PRO 6,1 CONFIGURATION
   # ==========================================
@@ -24,8 +28,18 @@
   boot.loader.efi.canTouchEfiVariables = true;
 
   networking.hostName = "trashcan";
-  networking.networkmanager.enable = true;
-  networking.networkmanager.wifi.powersave = false;
+  
+  # NETWORK REFACTOR: IWD (Fixes Broadcom Drops)
+  networking.networkmanager = {
+    enable = true;
+    wifi.backend = "iwd";
+    wifi.powersave = false;
+  };
+  
+  networking.wireless.iwd = {
+    enable = true;
+    settings.General.EnableNetworkConfiguration = true;
+  };
 
   services.tailscale.enable = true;
   
@@ -54,37 +68,34 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   environment.systemPackages = with pkgs; [
-    vim git htop btop pciutils lm_sensors fastfetch
+    git htop btop pciutils lm_sensors fastfetch neovim
+    
+    # INSTALL THE "MACPRONIX" CLI TOOL
+    # This reads the script from your local bin/ folder and makes it a system command
+    (pkgs.writeShellScriptBin "macpronix" (builtins.readFile ../../bin/macpronix))
   ];
 
-  # 4. USER IDENTITY
+  # 4. EDITOR CONFIGURATION
+  # --------------------------------------------------
+  environment.variables.EDITOR = "nvim";
+  environment.variables.VISUAL = "nvim";
+  
+  environment.shellAliases = {
+    vim = "nvim";
+    vi = "nvim";
+  };
+
+  # 5. USER IDENTITY
   # --------------------------------------------------
   users.users.admin = {
     isNormalUser = true;
     description = "Node Admin";
     extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [];
   };
 
-  # 5. LOCALIZATION
+  # 6. LOCALIZATION
   # --------------------------------------------------
   time.timeZone = "UTC"; 
   i18n.defaultLocale = "en_US.UTF-8";
   system.stateVersion = "24.11";
-
-  # 6. GITHUB RUNNER (Tarantula Org)
-  # --------------------------------------------------
-  services.github-runners = {
-    trashcan-worker = {
-      enable = true;
-      url = "https://github.com/tarantula-org"; 
-      tokenFile = "/etc/secrets/github-runner-token";
-      replace = true;
-      
-      # USE THE UNSTABLE PACKAGE TO FIX VERSION ERROR
-      package = pkgs-unstable.github-runner;
-      
-      extraPackages = with pkgs; [ git docker nodejs ];
-    };
-  };
 }

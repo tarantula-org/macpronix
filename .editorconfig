@@ -1,0 +1,30 @@
+root = true
+
+# --- GLOBAL DEFAULT ---
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# --- NIXOS CONFIGURATION ---
+[*.nix]
+indent_style = space
+indent_size = 2
+
+# --- BASH SCRIPTS ---
+[bin/*]
+indent_style = space
+indent_size = 4
+
+# --- BUILD SYSTEMS ---
+# Makefiles MUST use tabs, or they fail to build.
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# --- MARKDOWN ---
+[*.md]
+trim_trailing_whitespace = false
