@@ -2,8 +2,11 @@
 
 # ==============================================================================
 #  MACPRONIX // CLUSTER CONTROLLER
-#  v3.2 "Cobalt Prime"
+#  v3.3 "Universal Scale"
 # ==============================================================================
+
+# [SAFETY] Crash immediately if any command fails
+set -e
 
 # -- PALETTE --
 # High-Contrast Neon for TTY readability
@@ -16,13 +19,22 @@ NC='\033[0m'
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-RUNNER_CONFIG="$REPO_ROOT/hosts/trashcan/runner.nix"
 VERSION_FILE="$REPO_ROOT/VERSION.txt"
 
 # [SYSTEMS ENGINEERING] DYNAMIC DETECTION
-# Scans kernel device tree for the Broadcom chipset
-WIFI_IFACE=$(ls /sys/class/net/ | grep -E '^wl' | head -n 1)
-[ -z "$WIFI_IFACE" ] && WIFI_IFACE="wlan0"
+# 1. Identity: Automatically target the current machine's flake output
+TARGET_HOST=$(hostname)
+
+# 2. Hardware: Scan kernel device tree for the Broadcom chipset
+WIFI_IFACE=$(ls /sys/class/net/ | grep -E '^wl' | head -n 1 || echo "wlan0")
+
+# 3. Config: Dynamic pathing based on host (falls back to shared trashcan config)
+if [ -d "$REPO_ROOT/hosts/$TARGET_HOST" ]; then
+    RUNNER_CONFIG="$REPO_ROOT/hosts/$TARGET_HOST/runner.nix"
+else
+    # Default to the shared base if no specific host folder exists
+    RUNNER_CONFIG="$REPO_ROOT/hosts/trashcan/runner.nix"
+fi
 
 # Fetch Version
 if [ -f "$VERSION_FILE" ]; then
@@ -47,6 +59,7 @@ banner() {
 EOF
     echo -e "${NC}"
     echo -e "   ${CYAN}:: CLUSTER NODE CONTROLLER ::${NC}   ${GREY}v${VERSION}${NC}"
+    echo -e "   ${BLUE}:: IDENTITY: ${TARGET_HOST} ::${NC}"
     echo ""
 }
 
@@ -57,11 +70,15 @@ cmd_status() {
     echo -e "${BLUE}┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐${NC}"
     
     # 1. RUNNER
+    # Dynamic service name check based on common patterns
     echo -n -e "${BLUE}│${NC} Runner Node: "
-    if systemctl is-active --quiet github-runner-trashcan-worker; then
+    if systemctl is-active --quiet github-runner-${TARGET_HOST}-worker || \
+       systemctl is-active --quiet github-runner-trashcan-worker; then
         echo -e "${GREEN}● ONLINE${NC}"
-        CURRENT_ORG=$(grep 'url =' "$RUNNER_CONFIG" | cut -d '"' -f 2)
-        echo -e "${BLUE}│${NC} Target Org:  ${CYAN}$CURRENT_ORG${NC}"
+        if [ -f "$RUNNER_CONFIG" ]; then
+            CURRENT_ORG=$(grep 'url =' "$RUNNER_CONFIG" | cut -d '"' -f 2)
+            echo -e "${BLUE}│${NC} Target Org:  ${CYAN}$CURRENT_ORG${NC}"
+        fi
     else
         echo -e "${RED}● OFFLINE${NC}"
     fi
@@ -70,7 +87,7 @@ cmd_status() {
 
     # 2. TAILSCALE
     echo -n -e "${BLUE}│${NC} Tailscale:   "
-    TS_IP=$(tailscale ip -4 2>/dev/null)
+    TS_IP=$(tailscale ip -4 2>/dev/null || echo "")
     if [ ! -z "$TS_IP" ]; then
         echo -e "${GREEN}● ACTIVE${NC} ${GREY}($TS_IP)${NC}"
     else
@@ -116,9 +133,13 @@ cmd_set_org() {
     fi
     echo -e "${CYAN}:: RE-TARGETING CLUSTER ::${NC}"
     echo -e "New Target: ${BLUE}$NEW_URL${NC}"
-    sed -i "s|url = \".*\";|url = \"$NEW_URL\";|" "$RUNNER_CONFIG"
-    echo -e "${GREEN}✓ Configuration updated.${NC}"
-    echo -e "${GREY}Run 'macpronix sync' to apply changes.${NC}"
+    if [ -f "$RUNNER_CONFIG" ]; then
+        sed -i "s|url = \".*\";|url = \"$NEW_URL\";|" "$RUNNER_CONFIG"
+        echo -e "${GREEN}✓ Configuration updated.${NC}"
+        echo -e "${GREY}Run 'macpronix sync' to apply changes.${NC}"
+    else
+        echo -e "${RED}Error: Config file not found at $RUNNER_CONFIG${NC}"
+    fi
 }
 
 cmd_sync() {
@@ -126,15 +147,21 @@ cmd_sync() {
     cd "$REPO_ROOT"
     
     echo -e "${GREY}[1/3] Secure Pull (Stashing Changes)...${NC}"
+    # Force stash to handle dirty trees
     git stash push --include-untracked -m "macpronix-sync-auto" --quiet
     git pull --rebase
-    git stash pop --quiet 2>/dev/null || true
+    # Only pop if we actually stashed something
+    git stash list | grep "macpronix-sync-auto" > /dev/null && git stash pop --quiet || true
     
     echo -e "${GREY}[2/3] Resolving Permissions...${NC}"
-    sudo chown -R $USER . 2>/dev/null || true
+    # Self-heal: Ensure this script is executable for next time
+    chmod +x bin/macpronix
     
     echo -e "${GREY}[3/3] Rebuilding System...${NC}"
-    sudo nixos-rebuild switch --flake .#trashcan
+    echo -e "${BLUE}Target: .#${TARGET_HOST}${NC}"
+    
+    # [SCALING MAGIC] Builds the flake output matching current hostname
+    sudo nixos-rebuild switch --flake ".#${TARGET_HOST}" --show-trace
     
     echo -e "${GREEN}✓ SYSTEM SYNCED${NC}"
 }
@@ -145,7 +172,7 @@ cmd_upgrade() {
     echo -e "${GREY}[*] Updating Flake Inputs...${NC}"
     nix flake update
     echo -e "${GREY}[*] Rebuilding...${NC}"
-    sudo nixos-rebuild switch --flake .#trashcan
+    sudo nixos-rebuild switch --flake ".#${TARGET_HOST}"
     echo -e "${GREEN}✓ UPGRADE COMPLETE${NC}"
 }
 

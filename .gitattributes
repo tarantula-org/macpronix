@@ -1,0 +1,10 @@
+# Force Unix line endings for all shell scripts and executables
+*.sh text eol=lf
+bin/macpronix text eol=lf
+Makefile text eol=lf
+
+# Standardize other files
+*.nix text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
