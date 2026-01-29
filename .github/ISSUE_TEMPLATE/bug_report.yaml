@@ -1,27 +1,32 @@
-name: System Anomaly
-description: Report a deviation from expected infrastructure state.
-title: "[FAULT]: "
-labels: ["fix", "needs-triage"]
-body:
-  - type: markdown
-    attributes:
-      value: |
-        **OPERATIONAL STOP.**
-        If this is a physical hardware failure (Thermal/GPU), tag it as `[HARDWARE]`.
-  - type: textarea
-    id: reproduction
-    attributes:
-      label: Sequence of Events
-      description: Commands executed by the Operator.
-      placeholder: |
-        1. macpronix sync
-        2. Build fails at stage 2
-        3. Error: "Dependency conflict in flake.lock"
-    validations:
-      required: true
-  - type: textarea
-    id: logs
-    attributes:
-      label: Telemetry / Logs
-      description: Output of `macpronix status` or `journalctl`.
-      render: shell
+name: ASC-1.3 Integrity
+# Authority: Avant Systems Canon (Clause 8)
+# Target: Physical Compute Node (Trashcan)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  merge_group:
+
+jobs:
+  governance:
+    name: Governance Check
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Codeowners
+        run: |
+          if [ ! -f .github/CODEOWNERS ]; then
+            echo "::error::CODEOWNERS file missing. Violation of Tier 0 Governance."
+            exit 1
+          fi
+
+  system-integrity:
+    name: Nix Flake Verification
+    runs-on: self-hosted
+    needs: governance
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hardware Syntax Check
+        run: nix flake check --show-trace
