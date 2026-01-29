@@ -11,7 +11,7 @@ on:
 jobs:
   governance:
     name: Governance Check
-    runs-on: [self-hosted, linux, x64] # <--- THE CRITICAL SHIFT
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - name: Verify Codeowners
@@ -23,7 +23,7 @@ jobs:
 
   system-integrity:
     name: Nix Flake Verification
-    runs-on: [self-hosted, linux, x64] # <--- THE CRITICAL SHIFT
+    runs-on: self-hosted
     needs: governance
     steps:
       - uses: actions/checkout@v4
