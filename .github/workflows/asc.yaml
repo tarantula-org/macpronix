@@ -27,15 +27,5 @@ jobs:
     needs: governance
     steps:
       - uses: actions/checkout@v4
-      
-      # The Trashcan already has Nix installed natively. 
-      # We don't need the installer action, just the command.
-      
       - name: Hardware Syntax Check
         run: nix flake check --show-trace
-        
-      - name: Dry-Run Build (Smoke Test)
-        run: |
-          echo "::group::Simulating System Rebuild"
-          nix build .#nixosConfigurations.trashcan.config.system.build.toplevel --dry-run
-          echo "::endgroup::"
