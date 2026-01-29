@@ -2,7 +2,7 @@
 
 # ==============================================================================
 #  MACPRONIX // CLUSTER CONTROLLER
-#  v2.2 "Cobalt Trashcan"
+#  v2.3 "Cobalt Trashcan"
 # ==============================================================================
 
 # -- PALETTE (Blue/Cyan Theme) --
@@ -16,14 +16,21 @@ NC='\033[0m'
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
 RUNNER_CONFIG="$REPO_ROOT/hosts/trashcan/runner.nix"
-WIFI_IFACE="wlp13s0"  # Updated from wlan0
+
+# [SYSTEMS ENGINEERING] DYNAMIC HARDWARE DETECTION
+# Scans the kernel device tree for the first wireless interface
+WIFI_IFACE=$(ls /sys/class/net/ | grep -E '^wl' | head -n 1)
+
+# Fallback if detection fails (e.g. no driver loaded)
+if [ -z "$WIFI_IFACE" ]; then
+    WIFI_IFACE="wlan0"
+fi
 
 # -- VISUALS --
 
 banner() {
     clear
     echo -e "${BLUE}"
-    # QUOTED HEREDOC: Preserves ASCII art structure
     cat << "EOF"
     __  __
    /_/  \_\
@@ -34,7 +41,7 @@ banner() {
    \_\  /_/
 EOF
     echo -e "${NC}"
-    echo -e "   ${CYAN}:: TRASHCAN CLUSTER CONTROLLER ::${NC}   ${GREY}v2.2${NC}"
+    echo -e "   ${CYAN}:: TRASHCAN CLUSTER CONTROLLER ::${NC}   ${GREY}v2.3${NC}"
     echo ""
 }
 
@@ -65,15 +72,20 @@ cmd_status() {
         echo -e "${RED}● DISCONNECTED${NC}"
     fi
 
-    # 3. WIFI CHECK (IWD Backend)
+    # 3. WIFI CHECK (Auto-Detected)
     echo -n -e "${BLUE}│${NC} Uplink:      "
-    # Uses the correct interface wlp13s0
-    LINK=$(iwctl station $WIFI_IFACE show 2>/dev/null | grep "Connected network" | awk '{print $3}')
-    if [ ! -z "$LINK" ]; then
-        QUALITY=$(grep "$WIFI_IFACE" /proc/net/wireless | awk '{print int($3 * 100 / 70)}')
-        echo -e "${GREEN}● CONNECTED${NC} ${GREY}($LINK - ${QUALITY}% Signal)${NC}"
+    
+    # Check if interface exists
+    if [ ! -d "/sys/class/net/$WIFI_IFACE" ]; then
+        echo -e "${RED}● NO DEVICE${NC} ${GREY}(No wireless card found)${NC}"
     else
-         echo -e "${RED}● NO LINK${NC}"
+        LINK=$(iwctl station $WIFI_IFACE show 2>/dev/null | grep "Connected network" | awk '{print $3}')
+        if [ ! -z "$LINK" ]; then
+            QUALITY=$(grep "$WIFI_IFACE" /proc/net/wireless | awk '{print int($3 * 100 / 70)}')
+            echo -e "${GREEN}● CONNECTED${NC} ${GREY}($LINK - ${QUALITY}% Signal on $WIFI_IFACE)${NC}"
+        else
+             echo -e "${RED}● NO LINK${NC} ${GREY}($WIFI_IFACE idle)${NC}"
+        fi
     fi
     echo -e "${BLUE}└───────────────────────────────────────────────────────────┘${NC}"
     echo ""
@@ -98,7 +110,6 @@ cmd_sync() {
     echo -e "${GREY}[1/3] Pulling Manifests...${NC}"
     git pull
     echo -e "${GREY}[2/3] Resolving Dependencies...${NC}"
-    # No lockfile update by default for stability, use 'upgrade' for that
     echo -e "${GREY}[3/3] Rebuilding System...${NC}"
     sudo nixos-rebuild switch --flake .#trashcan
     echo -e "${GREEN}✓ SYSTEM SYNCED${NC}"
