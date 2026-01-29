@@ -12,13 +12,12 @@ TGT_HW  := hosts/trashcan/hardware.nix
 all: status
 
 # 2. BOOTSTRAP (First Run)
-# Includes 'fix-windows' to ensure the script is executable and clean
 install: fix-windows
 	@echo ":: INITIALIZING TRASHCAN NODE ::"
 	@if [ -f "$(HW_CFG)" ]; then \
 		echo "[*] Cloning hardware identity..."; \
 		cp "$(HW_CFG)" "$(TGT_HW)"; \
-		git add "$(TGT_HW)"; \
+		git add -f "$(TGT_HW)"; \
 	else \
 		echo "!! CI/CD Mode: Using template hardware config."; \
 	fi
@@ -27,7 +26,6 @@ install: fix-windows
 	@echo ":: DEPLOY COMPLETE. ::"
 
 # 3. MAINTENANCE
-# Includes 'fix-windows' so the CLI tool is always clean before running
 sync: fix-windows
 	@./bin/macpronix sync
 
@@ -38,12 +36,13 @@ status: fix-windows
 	@./bin/macpronix status
 
 # 4. UTILITIES
-# Removes Windows Line Endings (\r) and sets executable permissions
 fix-windows:
 	@chmod +x bin/macpronix
 	@sed -i 's/\r$$//' bin/macpronix || true
 
 # 5. CI/CD VERIFICATION
 check:
+	@echo "[*] Verifying Version File..."
+	@test -f VERSION.txt || (echo "Missing VERSION.txt" && exit 1)
 	@echo "[*] Verifying Flake Integrity..."
 	@nix flake check
