@@ -1,13 +1,12 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-unstable, ... }:
 
 {
   # ==========================================
   # UNIVERSAL MAC PRO 6,1 CONFIGURATION
   # ==========================================
 
-  # 1. HARDWARE QUIRKS (Model Specific, Unit Agnostic)
+  # 1. HARDWARE QUIRKS
   # --------------------------------------------------
-  # Fix Broadcom Wi-Fi (The "Catch-22" bypass)
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
     "broadcom-sta-6.30.223.271-59-6.12.67"
@@ -28,17 +27,14 @@
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
 
-  # Remote Access (Tailscale) & Firewall Safety
   services.tailscale.enable = true;
   
   networking.firewall = {
     enable = true;
-    # TRUST TAILSCALE: This prevents "Connection Timed Out" on reboot
     trustedInterfaces = [ "tailscale0" ];
     allowedTCPPorts = [ 22 ];
   };
 
-  # Headless Access (SSH)
   services.openssh = {
     enable = true;
     settings = {
@@ -61,7 +57,7 @@
     vim git htop btop pciutils lm_sensors fastfetch
   ];
 
-  # 4. USER IDENTITY (Default Admin)
+  # 4. USER IDENTITY
   # --------------------------------------------------
   users.users.admin = {
     isNormalUser = true;
@@ -70,10 +66,8 @@
     packages = with pkgs; [];
   };
 
-  # 5. LOCALIZATION (Server Standard)
+  # 5. LOCALIZATION
   # --------------------------------------------------
-  # UTC is recommended for servers to keep logs consistent.
-  # Change to "Europe/Madrid" if you prefer local time.
   time.timeZone = "UTC"; 
   i18n.defaultLocale = "en_US.UTF-8";
   system.stateVersion = "24.11";
@@ -83,10 +77,13 @@
   services.github-runners = {
     trashcan-worker = {
       enable = true;
-      # Points to the Organization root
       url = "https://github.com/tarantula-org"; 
       tokenFile = "/etc/secrets/github-runner-token";
       replace = true;
+      
+      # USE THE UNSTABLE PACKAGE TO FIX VERSION ERROR
+      package = pkgs-unstable.github-runner;
+      
       extraPackages = with pkgs; [ git docker nodejs ];
     };
   };
