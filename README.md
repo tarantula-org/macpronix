@@ -33,9 +33,8 @@ The node functions via three core configuration modules:
 **On the Trashcan:**
 
 ```bash
-# 1. Clone the flake
 git clone https://github.com/tarantula-tech/macpronix ~/macpronix
-
-# 2. Rebuild the system
-sudo nixos-rebuild switch --flake ~/macpronix#trashcan
+cd ~/macpronix
+chmod +x install.sh
+./install.sh
 ```
