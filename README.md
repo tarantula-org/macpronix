@@ -14,11 +14,11 @@
 
 <br />
 
-## <img src="https://cdn.simpleicons.org/blueprint/FFFFFF" width="24" style="vertical-align: bottom;" /> The Mission
+## <img src="https://cdn.simpleicons.org/blueprint/FFFFFF" width="24" style="vertical-align: bottom;" /> Mission
 
 **Macpronix** is an infrastructure initiative to reclaim the **Apple Mac Pro (Late 2013)** from obsolescence.
 
-We treat the "Trashcan" architecture not as legacy hardware, but as a dense, high-core-count compute node. This project creates a **declarative, reproducible operating system** that transforms the machine into a dedicated, headless GitHub Actions worker for the **Tarantula** ecosystem.
+We treat the "Trashcan" architecture not as legacy hardware, but as a dense, high-core-count compute node. This project creates a **declarative, reproducible operating system** that transforms the machine into a dedicated, **Self-Hosted GitHub Actions Worker** for the **Tarantula** ecosystem.
 
 It is **Immutable by Design**. The machine has no state; this repository is the single source of truth.
 
@@ -32,24 +32,37 @@ The system functions via three distinct, non-overlapping pillars:
 | **The Network** | <img src="https://img.shields.io/badge/IWD-Wireless_Daemon-black?style=flat&logo=linux&logoColor=white" height="20" /> | Replaces `wpa_supplicant` with **iwd** to eliminate packet loss on Broadcom chipsets. |
 | **The Cluster** | <img src="https://img.shields.io/badge/Tailscale-Mesh_VPN-white?style=flat&logo=tailscale&logoColor=black" height="20" /> | Zero-config mesh networking and firewall hole-punching for headless management. |
 
-## <img src="https://cdn.simpleicons.org/gnometerminal/FFFFFF" width="24" style="vertical-align: bottom;" /> The Interface
+## <img src="https://cdn.simpleicons.org/gnometerminal/FFFFFF" width="24" style="vertical-align: bottom;" /> Interface
 
-We reject loose shell scripts. The node is managed entirely through `macpronix`, a compiled CLI tool baked into the silicon. It abstracts complex NixOS rebuilds into simple, industrial commands.
+We reject loose shell scripts. The node is managed entirely through `macpronix`, a compiled CLI tool baked into the silicon. It abstracts complex NixOS rebuilds into simple, industrial commands and auto-corrects git state.
 
 ```text
-   :: TRASHCAN CLUSTER CONTROLLER ::   v2.1
+███╗   ███╗ █████╗  ██████╗██████╗ ██████╗  ██████╗ ███╗   ██╗██╗██╗  ██╗
+████╗ ████║██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔═══██╗████╗  ██║██║╚██╗██╔╝
+██╔████╔██║███████║██║     ██████╔╝██████╔╝██║   ██║██╔██╗ ██║██║ ╚███╔╝ 
+██║╚██╔╝██║██╔══██║██║     ██╔═══╝ ██╔══██╗██║   ██║██║╚██╗██║██║ ██╔██╗ 
+██║ ╚═╝ ██║██║  ██║╚██████╗██║     ██║  ██║╚██████╔╝██║ ╚████║██║██╔╝ ██╗
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝
+   :: CLUSTER NODE CONTROLLER ::   v3.2.0
 
 ┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐
 │ Runner Node: ● ONLINE
 │ Target Org:  [https://github.com/tarantula-org](https://github.com/tarantula-org)
 │
 │ Tailscale:   ● ACTIVE (100.88.114.90)
-│ Uplink:      ● CONNECTED (Studionet - 100% Signal)
+│ Uplink:      ● CONNECTED (Studionet)
 └───────────────────────────────────────────────────────────┘
 
 ```
 
-## <img src="https://cdn.simpleicons.org/nixos/000000" width="24" style="vertical-align: bottom;" /> Deployment
+## <img src="https://cdn.simpleicons.org/githubactions/FFFFFF" width="24" style="vertical-align: bottom;" /> Governance (ASC-1.3)
+
+This repository enforces **Tier-1 Physical Integrity**.
+
+* **Self-Hosted Execution:** CI pipelines do not run in the cloud. They execute physically on the Trashcan node.
+* **The Dead Man's Switch:** Branch protection is active. Pull Requests cannot be merged unless the physical hardware successfully builds the new system configuration.
+
+## <img src="https://cdn.simpleicons.org/nixos/FFFFFF" width="24" style="vertical-align: bottom;" /> Deployment & Ops
 
 **1. Bootstrap**
 Clone the repository to the target hardware.
@@ -57,7 +70,6 @@ Clone the repository to the target hardware.
 ```bash
 git clone https://github.com/tarantula-org/macpronix ~/macpronix
 cd ~/macpronix
-
 ```
 
 **2. Injection**
@@ -65,12 +77,11 @@ Inject the hardware identity and build the system.
 
 ```bash
 make install
-
 ```
 
-**3. Operation**
-Access the controller to manage state.
+**3. Maintenance (The Loop)**
+To update the system, push changes to GitHub from a remote machine, then run the sync command on the node. This automatically stashes local hardware configs, pulls the update, and rebuilds the OS.
 
 ```bash
-macpronix status
+macpronix sync
 ```
