@@ -2,28 +2,26 @@
   description = "Macpronix // The Trashcan Node";
 
   inputs = {
-    # Stable NixOS 24.11 (The current reliable standard)
+    # NixOS 24.11 (Stable)
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
 
-    # Community Hardware Library
-    # Critical for Mac Pro 6,1: Handles Broadcom Wi-Fi & Fan Sensors automatically
+    # Hardware Quirks
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
   };
 
   outputs = { self, nixpkgs, nixos-hardware, ... }: {
     nixosConfigurations = {
       
-      # Hostname: "trashcan"
       trashcan = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
-          # 1. Hardware Quirks (The "Magic" Fix)
-          nixos-hardware.nixosModules.apple-macpro-6-1
-          
-          # 2. Main Configuration
-          ./hosts/trashcan/default.nix
+          # FIX: Import the hardware module by direct path since the attribute is missing
+          "${nixos-hardware}/apple/macpro/6-1"
 
-          # 3. Hardware Scan (Your disk UUIDs)
+          # Main Config
+          ./hosts/trashcan/default.nix
+          
+          # Hardware Scan
           ./hosts/trashcan/hardware.nix
         ];
       };
