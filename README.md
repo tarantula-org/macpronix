@@ -6,15 +6,9 @@
   <p><b>Industrial Infrastructure for the Late 2013 Mac Pro</b></p>
   
   <p>
-    <a href="https://nixos.org">
-      <img src="https://img.shields.io/badge/OS-NixOS_24.11-5277c3?style=for-the-badge&logo=nixos&logoColor=white" />
-    </a>
-    <a href="LICENSE">
-      <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
-    </a>
-    <a href="https://tarantula.tech">
-      <img src="https://img.shields.io/badge/Standard-ASC_1.3-firebrick?style=for-the-badge&logo=checkmarx&logoColor=white" />
-    </a>
+    <a href="https://nixos.org"><img src="https://img.shields.io/badge/OS-NixOS_24.11-5277c3?style=for-the-badge&logo=nixos&logoColor=white" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" /></a>
+    <a href="https://tarantula.tech"><img src="https://img.shields.io/badge/Standard-ASC_1.3-firebrick?style=for-the-badge&logo=checkmarx&logoColor=white" /></a>
   </p>
 </div>
 
@@ -52,7 +46,6 @@ We reject loose shell scripts. The node is managed entirely through `macpronix`,
 │ Tailscale:   ● ACTIVE (100.88.114.90)
 │ Uplink:      ● CONNECTED (Studionet - 100% Signal)
 └───────────────────────────────────────────────────────────┘
-
 ```
 
 ## <img src="https://cdn.simpleicons.org/nixos/5a5d7c" width="24" style="vertical-align: bottom;" /> Deployment
@@ -61,7 +54,7 @@ We reject loose shell scripts. The node is managed entirely through `macpronix`,
 Clone the repository to the target hardware.
 
 ```bash
-git clone https://github.com/tarantula-org/macpronix ~/macpronix
+git clone [https://github.com/tarantula-org/macpronix](https://github.com/tarantula-org/macpronix) ~/macpronix
 cd ~/macpronix
 ```
 
