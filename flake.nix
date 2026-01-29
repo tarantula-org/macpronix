@@ -1,32 +1,37 @@
 {
-  description = "Macpronix // The Trashcan Node";
+  description = "Macpronix // The Trashcan Fleet";
 
   inputs = {
-    # Stable for the core system (Safe)
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
-    
-    # Unstable for the GitHub Runner (Bleeding Edge)
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, ... }: {
-    nixosConfigurations = {
-      trashcan = nixpkgs.lib.nixosSystem {
+  outputs = { self, nixpkgs, nixpkgs-unstable, ... }: 
+    let
+      # The Builder Function
+      mkMacPro = hostname: nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        
-        # This passes the unstable package set into your modules
         specialArgs = {
           pkgs-unstable = import nixpkgs-unstable {
             system = "x86_64-linux";
             config.allowUnfree = true;
           };
         };
-
         modules = [
-          ./hosts/trashcan/default.nix
-          ./hosts/trashcan/hardware.nix
+          ./hosts/trashcan/default.nix  # The shared config
+          ./hosts/trashcan/hardware.nix # The shared hardware definition
+          {
+            networking.hostName = hostname;
+          }
         ];
       };
+    in {
+      nixosConfigurations = {
+        # Node 1 (The current one)
+        trashcan = mkMacPro "trashcan";
+        
+        # Node 2 (Ready for expansion)
+        # trashcan-02 = mkMacPro "trashcan-02";
+      };
     };
-  };
 }
