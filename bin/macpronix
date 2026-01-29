@@ -84,43 +84,24 @@ EOF
 }
 
 cmd_sync() {
-    log_info "Initiating Sync Protocol..."
+    log_info "Initiating Fleet-Safe Sync..."
+    cd "$REPO_ROOT"
+
+    # 1. Windows/CRLF Cleanup
+    # Automatically remove carriage returns if they snuck in
+    find . -type f -name "*.nix" -exec sed -i 's/\r//' {} +
+
+    # 2. Build & Test (No Switch yet!)
+    log_info "Building configuration..."
+    if ! sudo nixos-rebuild test --flake ".#${TARGET_HOST}" --impure; then
+        die "Build failed. Check the logs above."
+    fi
+
+    # 3. Finalize
+    log_info "Build verified. Persisting to bootloader..."
+    sudo nixos-rebuild boot --flake ".#${TARGET_HOST}" --impure
     
-    cd "$REPO_ROOT" || die "Could not find repository at $REPO_ROOT"
-
-    # 1. State Protection
-    if [[ -n $(git status --porcelain) ]]; then
-        log_warn "Dirty tree detected. Stashing changes..."
-        git stash push --include-untracked -m "$STASH_NAME" --quiet
-    else
-        log_info "Tree is clean."
-    fi
-
-    # 2. Update
-    log_info "Pulling from origin..."
-    if ! git pull --rebase; then
-        die "Git pull failed. Fix conflicts manually."
-    fi
-
-    # 3. Build
-    log_info "Rebuilding System (.#${TARGET_HOST})..."
-    log_warn "If this hangs at 'restarting polkit', wait 30s."
-    
-    if sudo nixos-rebuild switch --flake ".#${TARGET_HOST}" --show-trace; then
-        echo ""
-        log_success "Build Complete."
-    else
-        echo ""
-        die "NixOS Build Failed. System not updated."
-    fi
-    
-    # 4. Restoration (Trap handles failure, we handle success)
-    if git stash list | grep -q "$STASH_NAME"; then
-        log_info "Restoring local changes..."
-        git stash pop --quiet >/dev/null
-    fi
-
-    log_success "SYSTEM SYNCED SUCCESSFULLY"
+    log_success "Sync complete. REBOOT to apply kernel/hardware changes safely."
 }
 
 cmd_status() {
