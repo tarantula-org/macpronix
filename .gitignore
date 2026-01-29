@@ -1,0 +1,16 @@
+# Nix Build Artifacts
+result
+result-*
+.direnv
+.devenv
+
+# Secrets & Local State
+*.key
+*.pem
+secrets/
+
+# Note: hardware.nix MUST be committed for CI to pass.
+
+# OS Noise
+.DS_Store
+Thumbs.db

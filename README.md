@@ -14,7 +14,7 @@
 
 <br />
 
-## <img src="https://cdn.simpleicons.org/blueprint/5a5d7c" width="24" style="vertical-align: bottom;" /> The Mission
+## <img src="https://cdn.simpleicons.org/blueprint/000000" width="24" style="vertical-align: bottom;" /> The Mission
 
 **Macpronix** is an infrastructure initiative to reclaim the **Apple Mac Pro (Late 2013)** from obsolescence.
 
@@ -22,7 +22,7 @@ We treat the "Trashcan" architecture not as legacy hardware, but as a dense, hig
 
 It is **Immutable by Design**. The machine has no state; this repository is the single source of truth.
 
-## <img src="https://cdn.simpleicons.org/polywork/5a5d7c" width="24" style="vertical-align: bottom;" /> Architecture
+## <img src="https://cdn.simpleicons.org/polywork/000000" width="24" style="vertical-align: bottom;" /> Architecture
 
 The system functions via three distinct, non-overlapping pillars:
 
@@ -32,7 +32,7 @@ The system functions via three distinct, non-overlapping pillars:
 | **The Network** | <img src="https://img.shields.io/badge/IWD-Wireless_Daemon-black?style=flat&logo=linux&logoColor=white" height="20" /> | Replaces `wpa_supplicant` with **iwd** to eliminate packet loss on Broadcom chipsets. |
 | **The Cluster** | <img src="https://img.shields.io/badge/Tailscale-Mesh_VPN-white?style=flat&logo=tailscale&logoColor=black" height="20" /> | Zero-config mesh networking and firewall hole-punching for headless management. |
 
-## <img src="https://cdn.simpleicons.org/gnometerminal/5a5d7c" width="24" style="vertical-align: bottom;" /> The Interface
+## <img src="https://cdn.simpleicons.org/gnometerminal/000000" width="24" style="vertical-align: bottom;" /> The Interface
 
 We reject loose shell scripts. The node is managed entirely through `macpronix`, a compiled CLI tool baked into the silicon. It abstracts complex NixOS rebuilds into simple, industrial commands.
 
@@ -46,16 +46,18 @@ We reject loose shell scripts. The node is managed entirely through `macpronix`,
 │ Tailscale:   ● ACTIVE (100.88.114.90)
 │ Uplink:      ● CONNECTED (Studionet - 100% Signal)
 └───────────────────────────────────────────────────────────┘
+
 ```
 
-## <img src="https://cdn.simpleicons.org/nixos/5a5d7c" width="24" style="vertical-align: bottom;" /> Deployment
+## <img src="https://cdn.simpleicons.org/nixos/000000" width="24" style="vertical-align: bottom;" /> Deployment
 
 **1. Bootstrap**
 Clone the repository to the target hardware.
 
 ```bash
-git clone [https://github.com/tarantula-org/macpronix](https://github.com/tarantula-org/macpronix) ~/macpronix
+git clone https://github.com/tarantula-org/macpronix ~/macpronix
 cd ~/macpronix
+
 ```
 
 **2. Injection**
@@ -63,6 +65,7 @@ Inject the hardware identity and build the system.
 
 ```bash
 make install
+
 ```
 
 **3. Operation**
