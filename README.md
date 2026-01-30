@@ -55,6 +55,7 @@ make install
 ```
 
 **2. Maintenance**
+
 Update the configuration remotely, then sync the node:
 
 ```bash
