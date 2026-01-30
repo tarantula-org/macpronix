@@ -20,20 +20,18 @@
   boot.loader.efi.canTouchEfiVariables = true;
   services.mbpfan.enable = true;
 
-  # 3. NETWORKING (Broadcom Safe)
+  # 3. NETWORKING (Broadcom Compatibility Mode)
   networking.hostName = "trashcan";
   
   networking.networkmanager = {
     enable = true;
-    wifi.backend = "iwd"; # Keeps the stable backend
-    wifi.powersave = false;
+    # CRITICAL: 'wl' driver requires wpa_supplicant. iwd is too modern for this card.
+    wifi.backend = "wpa_supplicant"; 
+    wifi.powersave = false; # Prevents packet loss on Broadcom chips
   };
   
-  networking.wireless.iwd = {
-    enable = true;
-    # CRITICAL FIX: Set to false so NetworkManager (nmtui) controls IPs/DNS
-    settings.General.EnableNetworkConfiguration = false;
-  };
+  # Disable iwd to prevent race conditions for the card
+  networking.wireless.iwd.enable = false;
 
   services.tailscale.enable = true;
 
