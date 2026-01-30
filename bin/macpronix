@@ -1,68 +1,44 @@
 #!/usr/bin/env bash
 # ==============================================================================
 #  MACPRONIX // CLUSTER CONTROLLER
-#  v4.0.0 "Industrial Standard"
+#  v4.1.0 "Silicon Truth"
 # ==============================================================================
 
-# [STRICT MODE]
-# -e: Exit immediately on error
-# -u: Exit on undefined variables
-# -o pipefail: Exit if any part of a pipe fails
 set -euo pipefail
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-VERSION_FILE="$REPO_ROOT/VERSION.txt"
-STASH_NAME="macpronix-autosync-$(date +%s)"
+VERSION="4.1.0"
 
 # -- PALETTE --
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 GREY='\033[0;90m'
 NC='\033[0m'
 
 # -- UTILS --
-
-log_info()  { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success(){ echo -e "${GREEN}[OK]${NC}   $1"; }
-log_warn()  { echo -e "${CYAN}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERR]${NC}  $1"; }
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[OK]${NC}   $1"; }
+log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERR]${NC}  $1"; }
 
 die() {
     log_error "$1"
     exit 1
 }
 
-# -- TRAP HANDLER --
-# This function runs automatically if the script crashes or you Ctrl+C
-cleanup() {
-    EXIT_CODE=$?
-    if [ $EXIT_CODE -ne 0 ]; then
-        echo ""
-        log_warn "Script interrupted or failed (Code: $EXIT_CODE)."
-        
-        # Check if we left a stash behind
-        if git stash list | grep -q "$STASH_NAME"; then
-            log_warn "Restoring your local changes from stash..."
-            git stash pop --quiet >/dev/null || log_error "Could not auto-restore stash. Run 'git stash pop' manually."
-        fi
-    fi
-}
-trap cleanup EXIT INT TERM
-
 # -- CORE LOGIC --
 
 detect_identity() {
-    # 1. Hostname
     TARGET_HOST=$(hostname)
     
-    # 2. Config File
     if [ -d "$REPO_ROOT/hosts/$TARGET_HOST" ]; then
-        RUNNER_CONFIG="$REPO_ROOT/hosts/$TARGET_HOST/runner.nix"
+        FLAKE_TARGET="${TARGET_HOST}"
     else
-        RUNNER_CONFIG="$REPO_ROOT/hosts/trashcan/runner.nix"
+        FLAKE_TARGET="trashcan"
     fi
 }
 
@@ -78,51 +54,144 @@ banner() {
   |_|  |_/_/    \_\_____|_|    |_|  \_\\____/|_| \_|_____/_/ \_\
 EOF
     echo -e "${NC}"
-    echo -e "   ${CYAN}:: CLUSTER CONTROLLER ::${NC}   v4.0"
-    echo -e "   ${GREY}ID: ${TARGET_HOST}${NC}"
+    echo -e "   ${CYAN}:: CLUSTER CONTROLLER ::${NC}   v${VERSION}"
+    echo -e "   ${GREY}Node: ${TARGET_HOST} | Target: ${FLAKE_TARGET}${NC}"
     echo ""
 }
 
 cmd_sync() {
     log_info "Initiating Fleet-Safe Sync..."
-    cd "$REPO_ROOT"
+    cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # 1. Windows/CRLF Cleanup
-    # Automatically remove carriage returns if they snuck in
-    find . -type f -name "*.nix" -exec sed -i 's/\r//' {} +
-
-    # 2. Build & Test (No Switch yet!)
-    log_info "Building configuration..."
-    if ! sudo nixos-rebuild test --flake ".#${TARGET_HOST}" --impure; then
-        die "Build failed. Check the logs above."
+    # 1. Check for uncommitted changes
+    if [[ -n $(git status --porcelain) ]]; then
+        log_warn "Uncommitted changes detected. Stashing..."
+        git stash push -m "macpronix-autosync-$(date +%s)" || die "Failed to stash changes"
     fi
 
-    # 3. Finalize
-    log_info "Build verified. Persisting to bootloader..."
-    sudo nixos-rebuild boot --flake ".#${TARGET_HOST}" --impure
+    # 2. Pull latest from remote
+    log_info "Pulling latest configuration from GitHub..."
+    if ! git pull --rebase; then
+        log_error "Git pull failed. You may need to resolve conflicts manually."
+        exit 1
+    fi
+
+    # 3. Sanitize line endings (critical for Nix evaluator)
+    log_info "Sanitizing line endings..."
+    find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+    find . -type f -path "*/bin/*" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+
+    # 4. Test build (doesn't commit to bootloader)
+    log_info "Testing new configuration..."
+    if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
+        die "Build test failed. System remains on current config. Check logs above."
+    fi
+
+    # 5. Commit to bootloader
+    log_info "Build verified. Committing to bootloader..."
+    sudo nixos-rebuild boot --flake ".#${FLAKE_TARGET}" --impure || die "Failed to commit to bootloader"
     
-    log_success "Sync complete. REBOOT to apply kernel/hardware changes safely."
+    log_success "Sync complete. Reboot to activate new configuration."
+}
+
+cmd_upgrade() {
+    log_info "Upgrading Flake Inputs..."
+    cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
+
+    # Update flake.lock
+    log_info "Updating flake.lock..."
+    nix flake update || die "Flake update failed"
+
+    # Show what changed
+    log_info "Changes:"
+    git diff flake.lock
+
+    # Test the upgraded config
+    log_info "Testing upgraded configuration..."
+    if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
+        log_error "Upgraded config failed to build. Reverting flake.lock..."
+        git checkout flake.lock
+        die "Upgrade aborted. System remains on current config."
+    fi
+
+    log_success "Upgrade test passed. Commit flake.lock and run 'macpronix sync' to apply."
 }
 
 cmd_status() {
     banner
-    echo -e "${BLUE}┌──[ TELEMETRY ]────────────────────────────────────────────┐${NC}"
+    echo -e "${BLUE}┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐${NC}"
     
     # Runner Check
     echo -n -e "${BLUE}│${NC} CI Runner:   "
-    if systemctl is-active --quiet "github-runner-${TARGET_HOST}-worker" || \
-       systemctl is-active --quiet "github-runner-trashcan-worker"; then
+    if systemctl is-active --quiet "github-runner-${TARGET_HOST}-worker" 2>/dev/null || \
+       systemctl is-active --quiet "github-runner-trashcan-worker" 2>/dev/null; then
         echo -e "${GREEN}● ONLINE${NC}"
     else
         echo -e "${RED}● OFFLINE${NC}"
     fi
 
-    # Network
-    TS_IP=$(tailscale ip -4 2>/dev/null || echo "N/A")
-    echo -e "${BLUE}│${NC} Tailscale:   ${GREY}$TS_IP${NC}"
+    # Tailscale
+    echo -n -e "${BLUE}│${NC} Tailscale:   "
+    if TS_IP=$(tailscale ip -4 2>/dev/null); then
+        echo -e "${GREEN}● $TS_IP${NC}"
+    else
+        echo -e "${GREY}○ Not Connected${NC}"
+    fi
+
+    # WiFi
+    echo -n -e "${BLUE}│${NC} WiFi:        "
+    if WIFI_SSID=$(iwctl station wlan0 show 2>/dev/null | grep "Connected network" | awk '{print $3}'); then
+        echo -e "${GREEN}● $WIFI_SSID${NC}"
+    else
+        echo -e "${GREY}○ Disconnected${NC}"
+    fi
+
+    # System Load
+    echo -n -e "${BLUE}│${NC} Load Avg:    "
+    LOAD=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+    echo -e "${GREY}$LOAD${NC}"
+
+    # Disk Usage
+    echo -n -e "${BLUE}│${NC} Disk Usage:  "
+    DISK=$(df -h / | awk 'NR==2 {print $5}')
+    echo -e "${GREY}$DISK${NC}"
     
     echo -e "${BLUE}└───────────────────────────────────────────────────────────┘${NC}"
     echo ""
+}
+
+cmd_check() {
+    log_info "Running System Health Checks..."
+    cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
+
+    # Check 1: Flake integrity
+    log_info "Checking flake integrity..."
+    nix flake check --show-trace || die "Flake check failed"
+
+    # Check 2: Driver status
+    log_info "Checking Broadcom driver..."
+    if lsmod | grep -q "^wl "; then
+        log_success "wl driver loaded"
+    else
+        log_warn "wl driver not loaded - WiFi may not work"
+    fi
+
+    # Check 3: Conflicting drivers
+    if lsmod | grep -qE "b43|bcma|ssb"; then
+        log_error "Conflicting drivers detected! Check boot.kernelParams blacklist"
+    else
+        log_success "No conflicting drivers"
+    fi
+
+    # Check 4: Filesystems
+    log_info "Checking filesystems..."
+    if findmnt / > /dev/null && findmnt /boot > /dev/null; then
+        log_success "Root and boot filesystems mounted"
+    else
+        log_error "Filesystem mount issue detected"
+    fi
+
+    log_success "All checks passed"
 }
 
 # -- MAIN ROUTER --
@@ -130,13 +199,31 @@ cmd_status() {
 detect_identity
 
 case "${1:-help}" in
-    sync)   cmd_sync ;;
-    status) cmd_status ;;
-    help)
+    sync)
+        cmd_sync
+        ;;
+    upgrade)
+        cmd_upgrade
+        ;;
+    status)
+        cmd_status
+        ;;
+    check)
+        cmd_check
+        ;;
+    help|--help|-h)
         banner
-        echo "Usage: macpronix {sync|status}"
+        echo "Usage: macpronix <command>"
+        echo ""
+        echo "Commands:"
+        echo "  status    Show node telemetry"
+        echo "  sync      Pull latest config from GitHub and rebuild"
+        echo "  upgrade   Update flake.lock (nixpkgs, etc.)"
+        echo "  check     Run system health checks"
+        echo "  help      Show this message"
+        echo ""
         ;;
     *)
-        die "Unknown command: $1"
+        die "Unknown command: $1. Run 'macpronix help' for usage."
         ;;
 esac

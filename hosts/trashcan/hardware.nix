@@ -37,9 +37,9 @@
 
   # --- [ FILESYSTEM: UUID-PINNED ] ---
   # CRITICAL: Use UUIDs to prevent Stage 1 mount failures
-  # These UUIDs are verified for the Trashcan fleet
+  # These UUIDs are auto-injected by `make install` from your hardware
   fileSystems."/" = { 
-    device = "/dev/disk/by-uuid/c1aa063d-0726-4035-869f-3eee148ade07";
+    device = "/dev/disk/by-uuid/c1aa063d-0726-4035-869f-3eee148ade07";  # Root
     fsType = "ext4";
   };
 
@@ -47,13 +47,13 @@
   # The "noauto" + "x-systemd.automount" combo ensures the EFI partition
   # is mounted on-demand and won't block the boot process if busy
   fileSystems."/boot" = { 
-    device = "/dev/disk/by-uuid/9AE4-F6D8";
+    device = "/dev/disk/by-uuid/9AE4-F6D8";  # Boot
     fsType = "vfat";
     options = [ "fmask=0022" "dmask=0022" "noauto" "x-systemd.automount" ];
   };
 
   swapDevices = [ 
-    { device = "/dev/disk/by-uuid/df519fab-823c-456b-ba11-a1a95282b514"; } 
+    { device = "/dev/disk/by-uuid/df519fab-823c-456b-ba11-a1a95282b514"; }  # Swap
   ];
 
   # --- [ SYSTEM PLATFORM ] ---

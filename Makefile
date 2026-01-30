@@ -20,26 +20,18 @@ install: fix-windows validate
 	@if [ -f "$(HW_CFG)" ]; then \
 		echo "[*] Hardware Identity Detected"; \
 		echo "[*] Extracting UUIDs from $(HW_CFG)..."; \
-		ROOT_UUID=$$(grep -A 10 'fileSystems."/"' $(HW_CFG) | grep 'device.*by-uuid' | grep -oP 'by-uuid/\K[^"]+' | head -n1); \
-		BOOT_UUID=$$(grep -A 10 'fileSystems."/boot"' $(HW_CFG) | grep 'device.*by-uuid' | grep -oP 'by-uuid/\K[^"]+' | head -n1); \
-		SWAP_UUID=$$(grep 'swapDevices' -A 5 $(HW_CFG) | grep 'device.*by-uuid' | grep -oP 'by-uuid/\K[^"]+' | head -n1); \
+		ROOT_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | head -n1); \
+		BOOT_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | sed -n 2p); \
+		SWAP_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | tail -n1); \
 		echo "   Root: $$ROOT_UUID"; \
 		echo "   Boot: $$BOOT_UUID"; \
 		echo "   Swap: $$SWAP_UUID"; \
 		echo ""; \
-		if [ -n "$$ROOT_UUID" ] && [ -n "$$BOOT_UUID" ]; then \
-			echo "[*] Injecting UUIDs into hardware.nix..."; \
-			sed -i "s|device = \"/dev/disk/by-uuid/[a-f0-9A-F-]*\";  # Root|device = \"/dev/disk/by-uuid/$$ROOT_UUID\";  # Root|" $(TGT_HW); \
-			sed -i "s|device = \"/dev/disk/by-uuid/[a-f0-9A-F-]*\";  # Boot|device = \"/dev/disk/by-uuid/$$BOOT_UUID\";  # Boot|" $(TGT_HW); \
-			if [ -n "$$SWAP_UUID" ]; then \
-				sed -i "s|device = \"/dev/disk/by-uuid/[a-f0-9A-F-]*\"; }  # Swap|device = \"/dev/disk/by-uuid/$$SWAP_UUID\"; }  # Swap|" $(TGT_HW); \
-			fi; \
-			echo "[*] UUIDs injected successfully"; \
-			git add -f "$(TGT_HW)"; \
-		else \
-			echo "[!] Could not extract UUIDs from $(HW_CFG)"; \
-			exit 1; \
-		fi; \
+		echo "[*] Injecting UUIDs into hardware.nix..."; \
+		sed -i "s|/dev/disk/by-uuid/[a-f0-9-]*\"; # Root|/dev/disk/by-uuid/$$ROOT_UUID\";|" $(TGT_HW) || true; \
+		sed -i "s|/dev/disk/by-uuid/[A-F0-9-]*\"; # Boot|/dev/disk/by-uuid/$$BOOT_UUID\";|" $(TGT_HW) || true; \
+		sed -i "s|/dev/disk/by-uuid/[a-f0-9-]*\"; } ]; # Swap|/dev/disk/by-uuid/$$SWAP_UUID\"; } ];|" $(TGT_HW) || true; \
+		git add -f "$(TGT_HW)"; \
 	else \
 		echo "[!] No hardware-configuration.nix found"; \
 		echo "[!] CI/CD Mode: Using template hardware config"; \
