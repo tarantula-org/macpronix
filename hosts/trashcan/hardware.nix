@@ -41,7 +41,7 @@
   };
 
   swapDevices = [ 
-    { device = "/dev/disk/by-uuid/@SWAP_UUID@"; } 
+    @SWAP_CONFIG@
   ];
 
   # --- [ PLATFORM ] ---

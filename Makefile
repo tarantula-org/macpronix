@@ -1,5 +1,5 @@
 # --- MACPRONIX INFRASTRUCTURE ---
-# v4.2.0 "Silicon Truth"
+# v4.5.0 "Silicon Truth"
 
 # 1. ENVIRONMENT
 FLAKE   := .#trashcan
@@ -37,13 +37,17 @@ install: fix-windows validate
 	@echo ""
 	
 	@echo "[*] Injecting Identity into hardware.nix..."
-	@# We use a robust delimiter (|) to handle potential characters in paths
+	@# Inject Root and Boot
 	@sed -i "s|@ROOT_UUID@|$(ROOT_UUID)|g" $(TGT_HW)
 	@sed -i "s|@BOOT_UUID@|$(BOOT_UUID)|g" $(TGT_HW)
+	
+	@# Conditional Swap Injection (Prevents Emergency Mode if swap is missing)
 	@if [ -n "$(SWAP_UUID)" ]; then \
-		sed -i "s|@SWAP_UUID@|$(SWAP_UUID)|g" $(TGT_HW); \
+		echo "    -> Swap detected. Injecting config."; \
+		sed -i "s|@SWAP_CONFIG@|{ device = \"/dev/disk/by-uuid/$(SWAP_UUID)\"; }|g" $(TGT_HW); \
 	else \
-		echo "[!] No active swap found. Skipping swap injection."; \
+		echo "    -> No active swap. Clearing config."; \
+		sed -i "s|@SWAP_CONFIG@||g" $(TGT_HW); \
 	fi
 	
 	@git add -f "$(TGT_HW)"
