@@ -7,7 +7,7 @@ set -euo pipefail
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-VERSION="4.3.0" # "The Nuclear Option"
+VERSION="5.1.0"
 
 # -- PALETTE --
 RED='\033[0;31m'
@@ -49,45 +49,43 @@ EOF
 # -- CORE LOGIC --
 
 cmd_sync() {
-    log_info "Initiating Hard Sync (Remote is Truth)..."
+    log_info "Initiating synchronization..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # 1. FETCH & RESET (The Nuclear Option)
-    # We do not merge. We do not stash. We become the remote.
+    # 1. FETCH & RESET
+    # Enforce remote state as the single source of truth.
     log_info "Fetching upstream..."
     git fetch origin
 
-    log_warn "Forcing local state to match origin/main..."
     if ! git reset --hard origin/main; then
-        die "Git reset failed. Check your network or git remote."
+        die "Git reset failed. Check network."
     fi
 
     # 2. CLEANUP
-    # Remove untracked files (prevents flake.lock drift issues)
-    log_info "Scrubbing untracked files..."
+    # Remove untracked files to prevent lockfile drift.
     git clean -fd
 
     # 3. VACCINE
-    log_info "Sanitizing line endings..."
+    # Normalize line endings for Nix evaluator.
     find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
     chmod +x bin/macpronix
 
     # 4. DEPLOY
-    # We delegate the build to Make, which handles the Hardware Identity injection
-    log_info "Re-applying Silicon Truth & Building..."
+    # Delegate to Makefile for hardware injection and build.
+    log_info "Injecting hardware config and building..."
     make install
 }
 
 cmd_upgrade() {
-    log_info "Upgrading Flake Inputs..."
+    log_info "Upgrading system dependencies..."
     cd "$REPO_ROOT" || die "Repository not found"
     nix flake update
-    log_success "Flake updated. Commit 'flake.lock' to repo to apply to fleet."
+    log_success "Flake updated. Commit 'flake.lock' to push to fleet."
 }
 
 cmd_status() {
     banner
-    echo -e "${BLUE}┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐${NC}"
+    echo -e "${BLUE}┌──[ NODE TELEMETRY ]───────────────────────────────────────┐${NC}"
     
     echo -n -e "${BLUE}│${NC} CI Runner:   "
     if systemctl is-active --quiet "github-runner-trashcan-worker"; then
@@ -100,11 +98,10 @@ cmd_status() {
     if TS_IP=$(tailscale ip -4 2>/dev/null); then
         echo -e "${GREEN}● $TS_IP${NC}"
     else
-        echo -e "${GREY}○ Not Connected${NC}"
+        echo -e "${GREY}○ Disconnected${NC}"
     fi
 
     echo -n -e "${BLUE}│${NC} WiFi (NM):   "
-    # Updated to check NetworkManager since we switched back from iwd-only
     if NM_SSID=$(nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2); then
         echo -e "${GREEN}● $NM_SSID${NC}"
     else
@@ -123,6 +120,6 @@ case "${1:-help}" in
     status)  cmd_status ;;
     help|*)  
         banner
-        echo "Commands: sync, upgrade, status" 
+        echo "Usage: macpronix {sync|upgrade|status}" 
         ;;
 esac

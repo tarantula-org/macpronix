@@ -6,27 +6,25 @@
   ];
 
   # ==========================================
-  # MAC PRO 6,1 HARDWARE CONFIGURATION
+  # HARDWARE SPECIFICATION: MAC PRO 6,1
   # ==========================================
 
-  # --- [ STAGE 1: KERNEL PARAMETERS ] ---
-  # CRITICAL: Blacklist ALL conflicting Broadcom drivers to prevent deadlock
+  # --- [ KERNEL & DRIVERS ] ---
+  # Blacklist conflicting drivers to prevent Broadcom deadlock
   boot.kernelParams = [ 
     "modprobe.blacklist=b43,bcma,ssb,brcmsmac,b43legacy"
     "radeon.dpm=0" 
   ];
 
-  # --- [ STAGE 1: INITRD ] ---
-  # Load proprietary driver EARLY
+  # Early load proprietary WiFi driver
   boot.initrd.kernelModules = [ "wl" ];
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "usbhid" "usb_storage" "sd_mod" ];
   
-  # --- [ KERNEL MODULES ] ---
   boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
   boot.kernelModules = [ "kvm-intel" "wl" "applesmc" "coretemp" ];
 
-  # --- [ FILESYSTEM: AUTO-INJECTED ] ---
-  # The Makefile replaces these placeholders with the Silicon Truth from the active system.
+  # --- [ STORAGE ] ---
+  # UUIDs are injected dynamically by the Makefile during deployment.
   
   fileSystems."/" = { 
     device = "/dev/disk/by-uuid/@ROOT_UUID@";
@@ -36,16 +34,16 @@
   fileSystems."/boot" = { 
     device = "/dev/disk/by-uuid/@BOOT_UUID@";
     fsType = "vfat";
-    # Dead Man's Switch: Prevent boot hang if EFI is busy
+    # Prevent boot hangs if EFI partition is busy
     options = [ "fmask=0022" "dmask=0022" "noauto" "x-systemd.automount" ];
   };
 
-  # SWAP: Managed via comment anchor to prevent syntax errors in CI
+  # Swap configuration managed via injection
   swapDevices = [ 
     # @SWAP_CONFIG@
   ];
 
-  # --- [ PLATFORM ] ---
+  # --- [ ARCHITECTURE ] ---
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
   hardware.enableAllFirmware = true;

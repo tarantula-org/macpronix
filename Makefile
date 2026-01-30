@@ -12,23 +12,22 @@ all: status
 
 # 2. BOOTSTRAP (Zero-Touch)
 install: fix-windows validate
-	@echo ":: INITIALIZING NODE DEPLOYMENT ::"
+	@echo ":: DEPLOYING NODE ::"
 	
-	@echo "[*] Resetting hardware template..."
-	@# Ensures we start from the clean "Universal" state so sed finds the tags
+	@# Reset template to ensure sed targets exist
 	@git checkout $(TGT_HW) 2>/dev/null || true
 
-	@echo "[*] Probing Hardware (Silicon Truth)..."
-	@# Determine if we are in Installer Mode (/mnt) or Live Mode (/)
+	@echo "[*] Detecting hardware..."
+	@# Determine mount context (Installer vs Live)
 	$(eval ROOT_MNT := $(shell if mountpoint -q /mnt; then echo "/mnt"; else echo "/"; fi))
 	
-	@# Active Block Detection
+	@# Block Device Detection
 	$(eval ROOT_UUID := $(shell findmnt -n -o UUID -T $(ROOT_MNT)))
 	$(eval BOOT_UUID := $(shell findmnt -n -o UUID -T $(ROOT_MNT)/boot))
 	$(eval SWAP_UUID := $(shell blkid -t TYPE=swap -o value -s UUID | head -n1))
 	
 	@if [ -z "$(ROOT_UUID)" ] || [ -z "$(BOOT_UUID)" ]; then \
-		echo "[!] CRITICAL: Could not detect filesystem UUIDs."; \
+		echo "[!] ERROR: Critical filesystems not detected."; \
 		echo "    Root: $(ROOT_UUID)"; \
 		echo "    Boot: $(BOOT_UUID)"; \
 		exit 1; \
@@ -40,22 +39,18 @@ install: fix-windows validate
 	@echo "    Swap:   $(SWAP_UUID)"
 	@echo ""
 	
-	@echo "[*] Injecting Identity into hardware.nix..."
-	@# Inject Root and Boot (Targeting the string placeholders)
+	@echo "[*] Configuring storage..."
 	@sed -i "s|@ROOT_UUID@|$(ROOT_UUID)|g" $(TGT_HW)
 	@sed -i "s|@BOOT_UUID@|$(BOOT_UUID)|g" $(TGT_HW)
 	
-	@# Conditional Swap Injection (Targeting the comment anchor)
+	@# Conditional Swap Configuration
 	@if [ -n "$(SWAP_UUID)" ]; then \
-		echo "    -> Swap detected. Injecting config."; \
 		sed -i "s|# @SWAP_CONFIG@|{ device = \"/dev/disk/by-uuid/$(SWAP_UUID)\"; }|g" $(TGT_HW); \
 	else \
-		echo "    -> No active swap. Clearing config."; \
 		sed -i "s|# @SWAP_CONFIG@||g" $(TGT_HW); \
 	fi
 	
-	@echo "[*] Building System..."
-	@# If in installer, install. If live, switch.
+	@echo "[*] Building system..."
 	@if [ "$(ROOT_MNT)" = "/mnt" ]; then \
 		echo "    Mode: Installer"; \
 		sudo nixos-install --root /mnt --flake $(FLAKE) --no-root-passwd; \
@@ -65,7 +60,6 @@ install: fix-windows validate
 	fi
 	@echo ""
 	@echo ":: DEPLOY COMPLETE ::"
-	@echo ":: REBOOT RECOMMENDED ::"
 
 # 3. MAINTENANCE
 sync: fix-windows
@@ -84,7 +78,7 @@ fix-windows:
 	@sed -i 's/\r$$//' Makefile 2>/dev/null || true
 
 validate:
-	@echo "[*] Validating Nix Syntax..."
+	@echo "[*] Validating flake..."
 	@nix flake check --show-trace
 
 check: fix-windows
