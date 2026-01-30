@@ -1,87 +1,66 @@
 <div align="center">
-  <img src="logo.svg" alt="Macpronix Logo" width="160" />
-  <br />
-  <br />
-  <h1>macProNix</h1>
-  <p><b>Industrial Infrastructure for the Late 2013 Mac Pro</b></p>
-  
-  <p>
-    <a href="https://nixos.org"><img src="https://img.shields.io/badge/OS-NixOS_24.11-5277c3?style=for-the-badge&logo=nixos&logoColor=white" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" /></a>
-    <a href="https://tarantula.tech"><img src="https://img.shields.io/badge/Standard-ASC_1.3-firebrick?style=for-the-badge&logo=checkmarx&logoColor=white" /></a>
-  </p>
+
+# macProNix
+
+**Immutable NixOS Infrastructure for the Late 2013 Mac Pro**
+
+[![NixOS 24.11](https://img.shields.io/badge/NixOS-24.11-5277c3?style=flat-square&logo=nixos&logoColor=white)](https://nixos.org)
+[![MIT License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
 </div>
 
-<br />
+Transform your Mac Pro "Trashcan" into a self-hosted GitHub Actions runner with declarative, reproducible configuration.
 
-## <img src="https://cdn.simpleicons.org/blueprint/FFFFFF" width="24" style="vertical-align: bottom;" /> Mission
-
-**Macpronix** is an infrastructure initiative to reclaim the **Apple Mac Pro (Late 2013)** from obsolescence.
-
-We treat the "Trashcan" architecture not as legacy hardware, but as a dense, high-core-count compute node. This project creates a **declarative, reproducible operating system** that transforms the machine into a dedicated, **Self-Hosted GitHub Actions Worker** for the **Tarantula** ecosystem.
-
-It is **Immutable by Design**. The machine has no state; this repository is the single source of truth.
-
-## <img src="https://cdn.simpleicons.org/polywork/FFFFFF" width="24" style="vertical-align: bottom;" /> Architecture
-
-The system functions via three distinct, non-overlapping pillars:
-
-| Component | Stack | Responsibility |
-| :--- | :--- | :--- |
-| **The Kernel** | <img src="https://img.shields.io/badge/Broadcom-Drivers-red?style=flat&logo=broadcom&logoColor=white" height="20" /> | Manages proprietary 6,1 hardware quirks (`wl` drivers, thermal sensors, `radeon` throttling). |
-| **The Network** | <img src="https://img.shields.io/badge/IWD-Wireless_Daemon-black?style=flat&logo=linux&logoColor=white" height="20" /> | Replaces `wpa_supplicant` with **iwd** to eliminate packet loss on Broadcom chipsets. |
-| **The Cluster** | <img src="https://img.shields.io/badge/Tailscale-Mesh_VPN-white?style=flat&logo=tailscale&logoColor=black" height="20" /> | Zero-config mesh networking and firewall hole-punching for headless management. |
-
-## <img src="https://cdn.simpleicons.org/gnometerminal/FFFFFF" width="24" style="vertical-align: bottom;" /> Interface
-
-We reject loose shell scripts. The node is managed entirely through `macpronix`, a compiled CLI tool baked into the silicon. It abstracts complex NixOS rebuilds into simple, industrial commands and auto-corrects git state.
-
-```text
-███╗   ███╗ █████╗  ██████╗██████╗ ██████╗  ██████╗ ███╗   ██╗██╗██╗  ██╗
-████╗ ████║██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔═══██╗████╗  ██║██║╚██╗██╔╝
-██╔████╔██║███████║██║     ██████╔╝██████╔╝██║   ██║██╔██╗ ██║██║ ╚███╔╝ 
-██║╚██╔╝██║██╔══██║██║     ██╔═══╝ ██╔══██╗██║   ██║██║╚██╗██║██║ ██╔██╗ 
-██║ ╚═╝ ██║██║  ██║╚██████╗██║     ██║  ██║╚██████╔╝██║ ╚████║██║██╔╝ ██╗
-╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝
-   :: CLUSTER NODE CONTROLLER ::   v3.2.0
-
-┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐
-│ Runner Node: ● ONLINE
-│ Target Org:  [https://github.com/tarantula-org](https://github.com/tarantula-org)
-│
-│ Tailscale:   ● ACTIVE (100.88.114.90)
-│ Uplink:      ● CONNECTED (Studionet)
-└───────────────────────────────────────────────────────────┘
-
-```
-
-## <img src="https://cdn.simpleicons.org/githubactions/FFFFFF" width="24" style="vertical-align: bottom;" /> Governance (ASC-1.3)
-
-This repository enforces **Tier-1 Physical Integrity**.
-
-* **Self-Hosted Execution:** CI pipelines do not run in the cloud. They execute physically on the Trashcan node.
-* **The Dead Man's Switch:** Branch protection is active. Pull Requests cannot be merged unless the physical hardware successfully builds the new system configuration.
-
-## <img src="https://cdn.simpleicons.org/nixos/FFFFFF" width="24" style="vertical-align: bottom;" /> Deployment & Ops
-
-**1. Bootstrap**
-Clone the repository to the target hardware.
+## Quick Start
 
 ```bash
+# Clone and deploy
 git clone https://github.com/tarantula-org/macpronix ~/macpronix
 cd ~/macpronix
-```
-
-**2. Injection**
-Inject the hardware identity and build the system.
-
-```bash
 make install
-```
 
-**3. Maintenance (The Loop)**
-To update the system, push changes to GitHub from a remote machine, then run the sync command on the node. This automatically stashes local hardware configs, pulls the update, and rebuilds the OS.
-
-```bash
+# Update system
 macpronix sync
 ```
+
+## What This Does
+
+- **Declarative OS**: Entire system defined in code, no manual configuration
+- **GitHub Actions Runner**: Self-hosted CI/CD for the Tarantula ecosystem
+- **Hardware Optimization**: Fixes Broadcom WiFi issues, manages thermal/GPU quirks
+- **Zero-Touch Networking**: Tailscale mesh with automatic firewall traversal
+- **CLI Management**: `macpronix` tool for system operations
+
+## Architecture
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Kernel** | NixOS 24.11 | Hardware driver management (WiFi, GPU, thermal) |
+| **Network** | iwd + Tailscale | Stable WiFi (replaces wpa_supplicant) + mesh VPN |
+| **Compute** | GitHub Actions | Self-hosted runner node |
+
+## CLI Commands
+
+```bash
+macpronix sync     # Pull latest config and rebuild system
+macpronix status   # Show node telemetry
+macpronix help     # Full command reference
+```
+
+## System Requirements
+
+- Apple Mac Pro (Late 2013, 6,1 model)
+- Network connectivity during installation
+- GitHub organization access tokens (for runner setup)
+
+## CI/CD Integration
+
+All changes are validated on the physical hardware before merge. Pull requests must pass on-device builds to ensure configuration integrity.
+
+## License
+
+MIT - See [LICENSE](LICENSE) for details.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
