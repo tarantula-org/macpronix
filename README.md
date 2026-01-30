@@ -4,7 +4,7 @@
   <p><b>Industrial Infrastructure for the Late 2013 Mac Pro</b></p>
   
   <p>
-    <a href="https://nixos.org"><img src="https://img.shields.io/badge/OS-NixOS_24.11-5277c3?style=for-the-badge&logo=nixos&logoColor=white" /></a>
+    <a href="https://nixos.org"><img src="https://img.shields.io/badge/OS-NixOS-5277c3?style=for-the-badge&logo=nixos&logoColor=white" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" /></a>
     <a href="https://tarantula.tech"><img src="https://img.shields.io/badge/Standard-ASC_1.3-firebrick?style=for-the-badge&logo=checkmarx&logoColor=white" /></a>
   </p>
