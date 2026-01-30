@@ -26,7 +26,7 @@
   boot.kernelModules = [ "kvm-intel" "wl" "applesmc" "coretemp" ];
 
   # --- [ FILESYSTEM: AUTO-INJECTED ] ---
-  # The Makefile replaces these tags with the Silicon Truth from the active system.
+  # The Makefile replaces these placeholders with the Silicon Truth from the active system.
   
   fileSystems."/" = { 
     device = "/dev/disk/by-uuid/@ROOT_UUID@";
@@ -40,8 +40,9 @@
     options = [ "fmask=0022" "dmask=0022" "noauto" "x-systemd.automount" ];
   };
 
+  # SWAP: Managed via comment anchor to prevent syntax errors in CI
   swapDevices = [ 
-    @SWAP_CONFIG@
+    # @SWAP_CONFIG@
   ];
 
   # --- [ PLATFORM ] ---

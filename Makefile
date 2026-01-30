@@ -1,5 +1,4 @@
 # --- MACPRONIX INFRASTRUCTURE ---
-# v4.5.0 "Silicon Truth"
 
 # 1. ENVIRONMENT
 FLAKE   := .#trashcan
@@ -14,6 +13,11 @@ all: status
 # 2. BOOTSTRAP (Zero-Touch)
 install: fix-windows validate
 	@echo ":: INITIALIZING NODE DEPLOYMENT ::"
+	
+	@echo "[*] Resetting hardware template..."
+	@# Ensures we start from the clean "Universal" state so sed finds the tags
+	@git checkout $(TGT_HW) 2>/dev/null || true
+
 	@echo "[*] Probing Hardware (Silicon Truth)..."
 	@# Determine if we are in Installer Mode (/mnt) or Live Mode (/)
 	$(eval ROOT_MNT := $(shell if mountpoint -q /mnt; then echo "/mnt"; else echo "/"; fi))
@@ -37,20 +41,18 @@ install: fix-windows validate
 	@echo ""
 	
 	@echo "[*] Injecting Identity into hardware.nix..."
-	@# Inject Root and Boot
+	@# Inject Root and Boot (Targeting the string placeholders)
 	@sed -i "s|@ROOT_UUID@|$(ROOT_UUID)|g" $(TGT_HW)
 	@sed -i "s|@BOOT_UUID@|$(BOOT_UUID)|g" $(TGT_HW)
 	
-	@# Conditional Swap Injection (Prevents Emergency Mode if swap is missing)
+	@# Conditional Swap Injection (Targeting the comment anchor)
 	@if [ -n "$(SWAP_UUID)" ]; then \
 		echo "    -> Swap detected. Injecting config."; \
-		sed -i "s|@SWAP_CONFIG@|{ device = \"/dev/disk/by-uuid/$(SWAP_UUID)\"; }|g" $(TGT_HW); \
+		sed -i "s|# @SWAP_CONFIG@|{ device = \"/dev/disk/by-uuid/$(SWAP_UUID)\"; }|g" $(TGT_HW); \
 	else \
 		echo "    -> No active swap. Clearing config."; \
-		sed -i "s|@SWAP_CONFIG@||g" $(TGT_HW); \
+		sed -i "s|# @SWAP_CONFIG@||g" $(TGT_HW); \
 	fi
-	
-	@git add -f "$(TGT_HW)"
 	
 	@echo "[*] Building System..."
 	@# If in installer, install. If live, switch.
@@ -82,6 +84,7 @@ fix-windows:
 	@sed -i 's/\r$$//' Makefile 2>/dev/null || true
 
 validate:
+	@echo "[*] Validating Nix Syntax..."
 	@nix flake check --show-trace
 
 check: fix-windows
