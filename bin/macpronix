@@ -7,7 +7,7 @@ set -euo pipefail
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-VERSION="4.2.0"
+VERSION="4.3.0" # "The Nuclear Option"
 
 # -- PALETTE --
 RED='\033[0;31m'
@@ -29,18 +29,6 @@ die() {
     exit 1
 }
 
-# -- CORE LOGIC --
-
-detect_identity() {
-    TARGET_HOST=$(hostname)
-    
-    if [ -d "$REPO_ROOT/hosts/$TARGET_HOST" ]; then
-        FLAKE_TARGET="${TARGET_HOST}"
-    else
-        FLAKE_TARGET="trashcan"
-    fi
-}
-
 banner() {
     clear
     echo -e "${BLUE}"
@@ -54,86 +42,60 @@ banner() {
 EOF
     echo -e "${NC}"
     echo -e "   ${CYAN}:: CLUSTER CONTROLLER ::${NC}   v${VERSION}"
-    echo -e "   ${GREY}Node: ${TARGET_HOST} | Target: ${FLAKE_TARGET}${NC}"
+    echo -e "   ${GREY}Node: $(hostname)${NC}"
     echo ""
 }
 
+# -- CORE LOGIC --
+
 cmd_sync() {
-    log_info "Initiating Fleet-Safe Sync..."
+    log_info "Initiating Hard Sync (Remote is Truth)..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # 1. AGGRESSIVE CLEANUP (The Fix)
-    # If flake.lock has drifted locally, we nuke it. The remote is truth.
-    if git diff --name-only | grep -q "flake.lock"; then
-        log_warn "Detected flake.lock drift. Discarding local changes..."
-        git checkout HEAD -- flake.lock
+    # 1. FETCH & RESET (The Nuclear Option)
+    # We do not merge. We do not stash. We become the remote.
+    log_info "Fetching upstream..."
+    git fetch origin
+
+    log_warn "Forcing local state to match origin/main..."
+    if ! git reset --hard origin/main; then
+        die "Git reset failed. Check your network or git remote."
     fi
 
-    # 2. Check for OTHER uncommitted changes
-    if [[ -n $(git status --porcelain) ]]; then
-        log_warn "Uncommitted changes detected. Stashing..."
-        git stash push -m "macpronix-autosync-$(date +%s)" || die "Failed to stash changes"
-    fi
+    # 2. CLEANUP
+    # Remove untracked files (prevents flake.lock drift issues)
+    log_info "Scrubbing untracked files..."
+    git clean -fd
 
-    # 3. Pull latest from remote
-    log_info "Pulling latest configuration from GitHub..."
-    if ! git pull --rebase; then
-        log_error "Git pull failed. You may need to resolve conflicts manually."
-        exit 1
-    fi
-
-    # 4. Sanitize line endings (Vaccine against Windows/SSH)
+    # 3. VACCINE
     log_info "Sanitizing line endings..."
     find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
-    find . -type f -path "*/bin/*" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+    chmod +x bin/macpronix
 
-    # 5. Test build (Safety Check)
-    log_info "Testing new configuration..."
-    if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
-        die "Build test failed. System remains on current config. Check logs above."
-    fi
-
-    # 6. Commit to bootloader
-    log_info "Build verified. Committing to bootloader..."
-    sudo nixos-rebuild boot --flake ".#${FLAKE_TARGET}" --impure || die "Failed to commit to bootloader"
-    
-    log_success "Sync complete. Reboot recommended to finalize kernel changes."
+    # 4. DEPLOY
+    # We delegate the build to Make, which handles the Hardware Identity injection
+    log_info "Re-applying Silicon Truth & Building..."
+    make install
 }
 
 cmd_upgrade() {
     log_info "Upgrading Flake Inputs..."
-    cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
-
-    log_info "Updating flake.lock..."
-    nix flake update || die "Flake update failed"
-
-    log_info "Changes:"
-    git diff flake.lock
-
-    log_info "Testing upgraded configuration..."
-    if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
-        log_error "Upgraded config failed to build. Reverting flake.lock..."
-        git checkout flake.lock
-        die "Upgrade aborted. System remains on current config."
-    fi
-
-    log_success "Upgrade test passed. Commit flake.lock and run 'macpronix sync' to apply."
+    cd "$REPO_ROOT" || die "Repository not found"
+    nix flake update
+    log_success "Flake updated. Commit 'flake.lock' to repo to apply to fleet."
 }
 
 cmd_status() {
     banner
     echo -e "${BLUE}┌──[ SYSTEM TELEMETRY ]─────────────────────────────────────┐${NC}"
     
-    # Runner Check
     echo -n -e "${BLUE}│${NC} CI Runner:   "
-    if systemctl is-active --quiet "github-runner-${TARGET_HOST}-worker" 2>/dev/null || \
-       systemctl is-active --quiet "github-runner-trashcan-worker" 2>/dev/null; then
+    if systemctl is-active --quiet "github-runner-trashcan-worker"; then
         echo -e "${GREEN}● ONLINE${NC}"
     else
         echo -e "${RED}● OFFLINE${NC}"
     fi
 
-    # Tailscale
     echo -n -e "${BLUE}│${NC} Tailscale:   "
     if TS_IP=$(tailscale ip -4 2>/dev/null); then
         echo -e "${GREEN}● $TS_IP${NC}"
@@ -141,80 +103,26 @@ cmd_status() {
         echo -e "${GREY}○ Not Connected${NC}"
     fi
 
-    # WiFi
-    echo -n -e "${BLUE}│${NC} WiFi:        "
-    if WIFI_SSID=$(iwctl station wlan0 show 2>/dev/null | grep "Connected network" | awk '{print $3}'); then
-        echo -e "${GREEN}● $WIFI_SSID${NC}"
+    echo -n -e "${BLUE}│${NC} WiFi (NM):   "
+    # Updated to check NetworkManager since we switched back from iwd-only
+    if NM_SSID=$(nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2); then
+        echo -e "${GREEN}● $NM_SSID${NC}"
     else
         echo -e "${GREY}○ Disconnected${NC}"
     fi
-
-    # System Load
-    echo -n -e "${BLUE}│${NC} Load Avg:    "
-    LOAD=$(uptime | awk -F'load average:' '{print $2}' | xargs)
-    echo -e "${GREY}$LOAD${NC}"
-
-    # Disk Usage
-    echo -n -e "${BLUE}│${NC} Disk Usage:  "
-    DISK=$(df -h / | awk 'NR==2 {print $5}')
-    echo -e "${GREY}$DISK${NC}"
     
     echo -e "${BLUE}└───────────────────────────────────────────────────────────┘${NC}"
     echo ""
 }
 
-cmd_check() {
-    log_info "Running System Health Checks..."
-    cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
-
-    log_info "Checking flake integrity..."
-    nix flake check --show-trace || die "Flake check failed"
-
-    log_info "Checking Broadcom driver..."
-    if lsmod | grep -q "^wl "; then
-        log_success "wl driver loaded"
-    else
-        log_warn "wl driver not loaded - WiFi may not work"
-    fi
-
-    if lsmod | grep -qE "b43|bcma|ssb"; then
-        log_error "Conflicting drivers detected! Check boot.kernelParams blacklist"
-    else
-        log_success "No conflicting drivers"
-    fi
-
-    log_info "Checking filesystems..."
-    if findmnt / > /dev/null && findmnt /boot > /dev/null; then
-        log_success "Root and boot filesystems mounted"
-    else
-        log_error "Filesystem mount issue detected"
-    fi
-
-    log_success "All checks passed"
-}
-
-# -- MAIN ROUTER --
-
-detect_identity
+# -- MAIN --
 
 case "${1:-help}" in
     sync)    cmd_sync ;;
     upgrade) cmd_upgrade ;;
     status)  cmd_status ;;
-    check)   cmd_check ;;
-    help|--help|-h)
+    help|*)  
         banner
-        echo "Usage: macpronix <command>"
-        echo ""
-        echo "Commands:"
-        echo "  status    Show node telemetry"
-        echo "  sync      Pull latest config from GitHub and rebuild"
-        echo "  upgrade   Update flake.lock (nixpkgs, etc.)"
-        echo "  check     Run system health checks"
-        echo "  help      Show this message"
-        echo ""
-        ;;
-    *)
-        die "Unknown command: $1. Run 'macpronix help' for usage."
+        echo "Commands: sync, upgrade, status" 
         ;;
 esac
