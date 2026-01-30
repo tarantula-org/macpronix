@@ -22,6 +22,7 @@
           ./hosts/trashcan/hardware.nix # The shared hardware definition
           {
             networking.hostName = hostname;
+            nixpkgs.config.allowUnfree = true; # Reinforce for the fleet
           }
         ];
       };

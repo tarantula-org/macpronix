@@ -22,7 +22,7 @@ install: fix-windows
 		echo "!! CI/CD Mode: Using template hardware config."; \
 	fi
 	@echo "[*] Building System..."
-	@sudo nixos-rebuild switch --flake $(FLAKE)
+	@sudo nixos-rebuild switch --flake $(FLAKE) --impure
 	@echo ":: DEPLOY COMPLETE. ::"
 
 # 3. MAINTENANCE
@@ -36,8 +36,10 @@ status: fix-windows
 	@./bin/macpronix status
 
 # 4. UTILITIES
+# Added recursive sed to ensure all nix files are sanitized for the evaluator
 fix-windows:
 	@chmod +x bin/macpronix
+	@find . -type f -name "*.nix" -exec sed -i 's/\r$$//' {} +
 	@sed -i 's/\r$$//' bin/macpronix || true
 
 # 5. CI/CD VERIFICATION
