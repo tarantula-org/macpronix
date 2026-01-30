@@ -18,7 +18,6 @@
   # 2. SYSTEM ARCHITECTURE
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  
   services.mbpfan.enable = true;
 
   # 3. NETWORKING (Broadcom Safe)
@@ -26,13 +25,14 @@
   
   networking.networkmanager = {
     enable = true;
-    wifi.backend = "iwd"; # Required for BCM4360 stability
+    wifi.backend = "iwd"; # Keeps the stable backend
     wifi.powersave = false;
   };
   
   networking.wireless.iwd = {
     enable = true;
-    settings.General.EnableNetworkConfiguration = true;
+    # CRITICAL FIX: Set to false so NetworkManager (nmtui) controls IPs/DNS
+    settings.General.EnableNetworkConfiguration = false;
   };
 
   services.tailscale.enable = true;
