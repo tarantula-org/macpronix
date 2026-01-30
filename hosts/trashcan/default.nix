@@ -6,38 +6,34 @@
   ];
 
   # ==========================================
-  # UNIVERSAL MAC PRO 6,1 CONFIGURATION
+  # UNIVERSAL MAC PRO 6,1 OS LAYER
   # ==========================================
-  # This file contains OS-level configs ONLY.
-  # Hardware-specific boot configs are in hardware.nix.
+  # Software, Networking, and User Identity Only.
+  # Hardware/Kernel logic is strictly in hardware.nix.
 
-  # 1. SYSTEM PERMISSIONS
+  # 1. PERMISSIONS & COMPATIBILITY
   # --------------------------------------------------
   nixpkgs.config.allowUnfree = true;
   nixpkgs.config.permittedInsecurePackages = [
     "broadcom-sta-6.30.223.271-59-6.12.67"
   ];
 
-  # 2. THERMAL MANAGEMENT
-  # --------------------------------------------------
-  # mbpfan: MacBook Pro fan controller for thermal management
-  services.mbpfan.enable = true;
-
-  # 3. BOOT LOADER
+  # 2. SYSTEM ARCHITECTURE
   # --------------------------------------------------
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  
+  # Thermal management
+  services.mbpfan.enable = true;
 
-  # 4. NETWORKING
+  # 3. NETWORKING (Broadcom Safe)
   # --------------------------------------------------
   networking.hostName = "trashcan";
   
-  # NETWORK STACK: IWD replaces wpa_supplicant for stability
-  # The Broadcom BCM4360 has packet loss issues with wpa_supplicant
   networking.networkmanager = {
     enable = true;
-    wifi.backend = "iwd";
-    wifi.powersave = false;  # Disable power saving to prevent disconnects
+    wifi.backend = "iwd"; # Required for BCM4360 stability
+    wifi.powersave = false;
   };
   
   networking.wireless.iwd = {
@@ -45,17 +41,14 @@
     settings.General.EnableNetworkConfiguration = true;
   };
 
-  # MESH VPN: Tailscale for zero-config cluster networking
   services.tailscale.enable = true;
-  
-  # FIREWALL: Minimal attack surface
+
   networking.firewall = {
     enable = true;
     trustedInterfaces = [ "tailscale0" ];
-    allowedTCPPorts = [ 22 ];  # SSH only
+    allowedTCPPorts = [ 22 ];
   };
 
-  # SSH: Remote management
   services.openssh = {
     enable = true;
     settings = {
@@ -64,49 +57,35 @@
     };
   };
 
-  # 5. SYSTEM MAINTENANCE
+  # 4. MAINTENANCE
   # --------------------------------------------------
-  # Automatic garbage collection to prevent disk bloat
   nix.gc = {
     automatic = true;
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
 
-  # Enable flakes and nix-command
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # 6. SYSTEM PACKAGES
-  # --------------------------------------------------
   environment.systemPackages = with pkgs; [
-    # CORE UTILITIES
-    git htop btop pciutils lm_sensors fastfetch neovim
-    gnumake  # Required for Makefile workflows
-    
-    # CUSTOM CLI TOOL
+    # TOOLS
+    git htop btop pciutils lm_sensors fastfetch neovim gnumake
+    # CLI
     (pkgs.writeShellScriptBin "macpronix" (builtins.readFile ../../bin/macpronix))
   ];
 
-  # 7. EDITOR CONFIGURATION
+  # 5. ENVIRONMENT
   # --------------------------------------------------
   environment.variables.EDITOR = "nvim";
   environment.variables.VISUAL = "nvim";
-  
-  environment.shellAliases = {
-    vim = "nvim";
-    vi = "nvim";
-  };
+  environment.shellAliases = { vim = "nvim"; vi = "nvim"; };
 
-  # 8. USER IDENTITY
-  # --------------------------------------------------
   users.users.admin = {
     isNormalUser = true;
     description = "Node Admin";
     extraGroups = [ "networkmanager" "wheel" ];
   };
 
-  # 9. LOCALIZATION
-  # --------------------------------------------------
   time.timeZone = "UTC"; 
   i18n.defaultLocale = "en_US.UTF-8";
   system.stateVersion = "24.11";

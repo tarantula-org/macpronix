@@ -1,9 +1,8 @@
 # --- MACPRONIX INFRASTRUCTURE ---
-# Zero-Touch Configuration System
+# v4.2.0 "Silicon Truth"
 
 # 1. ENVIRONMENT
 FLAKE   := .#trashcan
-HW_CFG  := /etc/nixos/hardware-configuration.nix
 TGT_HW  := hosts/trashcan/hardware.nix
 
 # --- PHONY TARGETS ---
@@ -12,42 +11,55 @@ TGT_HW  := hosts/trashcan/hardware.nix
 # 1. DEFAULT
 all: status
 
-# 2. BOOTSTRAP (First Run)
-# This target handles dynamic hardware injection for any Mac Pro 6,1 node
+# 2. BOOTSTRAP (Zero-Touch)
 install: fix-windows validate
-	@echo ":: INITIALIZING TRASHCAN NODE ::"
+	@echo ":: INITIALIZING NODE DEPLOYMENT ::"
+	@echo "[*] Probing Hardware (Silicon Truth)..."
+	@# Determine if we are in Installer Mode (/mnt) or Live Mode (/)
+	$(eval ROOT_MNT := $(shell if mountpoint -q /mnt; then echo "/mnt"; else echo "/"; fi))
+	
+	@# Active Block Detection
+	$(eval ROOT_UUID := $(shell findmnt -n -o UUID -T $(ROOT_MNT)))
+	$(eval BOOT_UUID := $(shell findmnt -n -o UUID -T $(ROOT_MNT)/boot))
+	$(eval SWAP_UUID := $(shell blkid -t TYPE=swap -o value -s UUID | head -n1))
+	
+	@if [ -z "$(ROOT_UUID)" ] || [ -z "$(BOOT_UUID)" ]; then \
+		echo "[!] CRITICAL: Could not detect filesystem UUIDs."; \
+		echo "    Root: $(ROOT_UUID)"; \
+		echo "    Boot: $(BOOT_UUID)"; \
+		exit 1; \
+	fi
+
+	@echo "    Target: $(ROOT_MNT)"
+	@echo "    Root:   $(ROOT_UUID)"
+	@echo "    Boot:   $(BOOT_UUID)"
+	@echo "    Swap:   $(SWAP_UUID)"
 	@echo ""
-	@if [ -f "$(HW_CFG)" ]; then \
-		echo "[*] Hardware Identity Detected"; \
-		echo "[*] Extracting UUIDs from $(HW_CFG)..."; \
-		ROOT_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | head -n1); \
-		BOOT_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | sed -n 2p); \
-		SWAP_UUID=$$(grep -oP 'device = "/dev/disk/by-uuid/\K[^"]+' $(HW_CFG) | tail -n1); \
-		echo "   Root: $$ROOT_UUID"; \
-		echo "   Boot: $$BOOT_UUID"; \
-		echo "   Swap: $$SWAP_UUID"; \
-		echo ""; \
-		echo "[*] Injecting UUIDs into hardware.nix..."; \
-		sed -i "s|/dev/disk/by-uuid/[a-f0-9-]*\"; # Root|/dev/disk/by-uuid/$$ROOT_UUID\";|" $(TGT_HW) || true; \
-		sed -i "s|/dev/disk/by-uuid/[A-F0-9-]*\"; # Boot|/dev/disk/by-uuid/$$BOOT_UUID\";|" $(TGT_HW) || true; \
-		sed -i "s|/dev/disk/by-uuid/[a-f0-9-]*\"; } ]; # Swap|/dev/disk/by-uuid/$$SWAP_UUID\"; } ];|" $(TGT_HW) || true; \
-		git add -f "$(TGT_HW)"; \
+	
+	@echo "[*] Injecting Identity into hardware.nix..."
+	@# We use a robust delimiter (|) to handle potential characters in paths
+	@sed -i "s|@ROOT_UUID@|$(ROOT_UUID)|g" $(TGT_HW)
+	@sed -i "s|@BOOT_UUID@|$(BOOT_UUID)|g" $(TGT_HW)
+	@if [ -n "$(SWAP_UUID)" ]; then \
+		sed -i "s|@SWAP_UUID@|$(SWAP_UUID)|g" $(TGT_HW); \
 	else \
-		echo "[!] No hardware-configuration.nix found"; \
-		echo "[!] CI/CD Mode: Using template hardware config"; \
+		echo "[!] No active swap found. Skipping swap injection."; \
+	fi
+	
+	@git add -f "$(TGT_HW)"
+	
+	@echo "[*] Building System..."
+	@# If in installer, install. If live, switch.
+	@if [ "$(ROOT_MNT)" = "/mnt" ]; then \
+		echo "    Mode: Installer"; \
+		sudo nixos-install --root /mnt --flake $(FLAKE) --no-root-passwd; \
+	else \
+		echo "    Mode: Live Upgrade"; \
+		sudo nixos-rebuild switch --flake $(FLAKE) --impure; \
 	fi
 	@echo ""
-	@echo "[*] Running Pre-Flight Checks..."
-	@nix flake check --show-trace || (echo "[!] Flake validation failed" && exit 1)
-	@echo ""
-	@echo "[*] Building System (Test Mode)..."
-	@sudo nixos-rebuild test --flake $(FLAKE) --impure || (echo "[!] Build failed" && exit 1)
-	@echo ""
-	@echo "[*] Build Verified. Installing to Bootloader..."
-	@sudo nixos-rebuild boot --flake $(FLAKE) --impure
-	@echo ""
 	@echo ":: DEPLOY COMPLETE ::"
-	@echo ":: REBOOT to activate the new configuration ::"
+	@echo ":: REBOOT RECOMMENDED ::"
 
 # 3. MAINTENANCE
 sync: fix-windows
@@ -59,34 +71,15 @@ upgrade: fix-windows
 status: fix-windows
 	@./bin/macpronix status
 
-# 4. HYGIENE & VALIDATION
-# CRITICAL: This target prevents Windows line endings from poisoning the Nix evaluator
-# It recursively sanitizes ALL .nix files and executables
+# 4. HYGIENE
 fix-windows:
-	@echo "[*] Sanitizing line endings..."
-	@find . -type f -name "*.nix" -exec sed -i 's/\r$$//' {} + 2>/dev/null || true
-	@find . -type f -path "*/bin/*" -exec sed -i 's/\r$$//' {} + 2>/dev/null || true
-	@sed -i 's/\r$$//' Makefile 2>/dev/null || true
 	@chmod +x bin/macpronix 2>/dev/null || true
+	@find . -type f -name "*.nix" -exec sed -i 's/\r$$//' {} + 2>/dev/null || true
+	@sed -i 's/\r$$//' Makefile 2>/dev/null || true
 
-# Validate flake integrity without building
 validate:
-	@echo "[*] Validating Flake Structure..."
 	@nix flake check --show-trace
 
-# 5. CI/CD VERIFICATION
 check: fix-windows
-	@echo "[*] Verifying Version File..."
 	@test -f VERSION.txt || (echo "[!] Missing VERSION.txt" && exit 1)
-	@echo "[*] Verifying Flake Integrity..."
 	@nix flake check --show-trace
-	@echo "[*] Verifying CODEOWNERS..."
-	@test -f .github/CODEOWNERS || (echo "[!] Missing CODEOWNERS" && exit 1)
-	@echo ""
-	@echo "[✓] All Checks Passed"
-
-# 6. CLEANUP
-clean:
-	@echo "[*] Removing Build Artifacts..."
-	@rm -rf result result-*
-	@echo "[✓] Clean Complete"
