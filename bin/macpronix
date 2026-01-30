@@ -7,7 +7,7 @@ set -euo pipefail
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-VERSION="4.1.0"
+VERSION="4.2.0"
 
 # -- PALETTE --
 RED='\033[0;31m'
@@ -62,50 +62,54 @@ cmd_sync() {
     log_info "Initiating Fleet-Safe Sync..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # 1. Check for uncommitted changes
+    # 1. AGGRESSIVE CLEANUP (The Fix)
+    # If flake.lock has drifted locally, we nuke it. The remote is truth.
+    if git diff --name-only | grep -q "flake.lock"; then
+        log_warn "Detected flake.lock drift. Discarding local changes..."
+        git checkout HEAD -- flake.lock
+    fi
+
+    # 2. Check for OTHER uncommitted changes
     if [[ -n $(git status --porcelain) ]]; then
         log_warn "Uncommitted changes detected. Stashing..."
         git stash push -m "macpronix-autosync-$(date +%s)" || die "Failed to stash changes"
     fi
 
-    # 2. Pull latest from remote
+    # 3. Pull latest from remote
     log_info "Pulling latest configuration from GitHub..."
     if ! git pull --rebase; then
         log_error "Git pull failed. You may need to resolve conflicts manually."
         exit 1
     fi
 
-    # 3. Sanitize line endings (critical for Nix evaluator)
+    # 4. Sanitize line endings (Vaccine against Windows/SSH)
     log_info "Sanitizing line endings..."
     find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
     find . -type f -path "*/bin/*" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
 
-    # 4. Test build (doesn't commit to bootloader)
+    # 5. Test build (Safety Check)
     log_info "Testing new configuration..."
     if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
         die "Build test failed. System remains on current config. Check logs above."
     fi
 
-    # 5. Commit to bootloader
+    # 6. Commit to bootloader
     log_info "Build verified. Committing to bootloader..."
     sudo nixos-rebuild boot --flake ".#${FLAKE_TARGET}" --impure || die "Failed to commit to bootloader"
     
-    log_success "Sync complete. Reboot to activate new configuration."
+    log_success "Sync complete. Reboot recommended to finalize kernel changes."
 }
 
 cmd_upgrade() {
     log_info "Upgrading Flake Inputs..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # Update flake.lock
     log_info "Updating flake.lock..."
     nix flake update || die "Flake update failed"
 
-    # Show what changed
     log_info "Changes:"
     git diff flake.lock
 
-    # Test the upgraded config
     log_info "Testing upgraded configuration..."
     if ! sudo nixos-rebuild test --flake ".#${FLAKE_TARGET}" --impure; then
         log_error "Upgraded config failed to build. Reverting flake.lock..."
@@ -163,11 +167,9 @@ cmd_check() {
     log_info "Running System Health Checks..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # Check 1: Flake integrity
     log_info "Checking flake integrity..."
     nix flake check --show-trace || die "Flake check failed"
 
-    # Check 2: Driver status
     log_info "Checking Broadcom driver..."
     if lsmod | grep -q "^wl "; then
         log_success "wl driver loaded"
@@ -175,14 +177,12 @@ cmd_check() {
         log_warn "wl driver not loaded - WiFi may not work"
     fi
 
-    # Check 3: Conflicting drivers
     if lsmod | grep -qE "b43|bcma|ssb"; then
         log_error "Conflicting drivers detected! Check boot.kernelParams blacklist"
     else
         log_success "No conflicting drivers"
     fi
 
-    # Check 4: Filesystems
     log_info "Checking filesystems..."
     if findmnt / > /dev/null && findmnt /boot > /dev/null; then
         log_success "Root and boot filesystems mounted"
@@ -198,18 +198,10 @@ cmd_check() {
 detect_identity
 
 case "${1:-help}" in
-    sync)
-        cmd_sync
-        ;;
-    upgrade)
-        cmd_upgrade
-        ;;
-    status)
-        cmd_status
-        ;;
-    check)
-        cmd_check
-        ;;
+    sync)    cmd_sync ;;
+    upgrade) cmd_upgrade ;;
+    status)  cmd_status ;;
+    check)   cmd_check ;;
     help|--help|-h)
         banner
         echo "Usage: macpronix <command>"
