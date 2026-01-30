@@ -1,7 +1,7 @@
 <div align="center">
   <img src="logo.svg" alt="macProNix Logo" width="160" />
   <h1>macProNix</h1>
-  <p><b>Transform your Mac Pro "Trashcan" into a self-hosted GitHub Actions runner.</b></p>
+  <p><b>Transform "Trashcan" Mac Pros into a self-hosted cluster</b></p>
 
   <p>
     <p> <a href="https://nixos.org"><img src="https://img.shields.io/badge/OS-NixOS_24.11-5277c3?style=for-the-badge&logo=nixos&logoColor=white" /></a> <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" /></a> <a href="https://tarantula.tech"><img src="https://img.shields.io/badge/Standard-ASC_1.3-firebrick?style=for-the-badge&logo=checkmarx&logoColor=white" /></a> </p> </div>
