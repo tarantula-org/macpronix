@@ -53,7 +53,6 @@ cmd_sync() {
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
     # 1. FETCH & RESET
-    # Enforce remote state as the single source of truth.
     log_info "Fetching upstream..."
     git fetch origin
 
@@ -62,17 +61,21 @@ cmd_sync() {
     fi
 
     # 2. CLEANUP
-    # Remove untracked files to prevent lockfile drift.
-    # [CRITICAL] Exclude local keys to prevent lockout during SSH hardening.
+    # Exclude local keys to prevent lockout.
     git clean -fd -e "*.keys"
 
-    # 3. VACCINE
-    # Normalize line endings for Nix evaluator.
+    # 3. [NEW] VISIBILITY HACK
+    # Force Nix to see the ignored keys by staging them as "intent-to-add".
+    if [ -f "hosts/trashcan/admin.keys" ]; then
+        log_info "Exposing local identity to Nix..."
+        git add --force --intent-to-add hosts/trashcan/admin.keys
+    fi
+
+    # 4. VACCINE
     find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
     chmod +x bin/macpronix
 
-    # 4. DEPLOY
-    # Delegate to Makefile for hardware injection and build.
+    # 5. DEPLOY
     log_info "Injecting hardware config and building..."
     make install
 }
