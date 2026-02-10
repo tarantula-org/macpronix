@@ -15,41 +15,47 @@
     "broadcom-sta-6.30.223.271-59-6.12.67"
   ];
 
-  # 2. SYSTEM ARCHITECTURE
+  # 2. VIRTUALISATION [NEW]
+  virtualisation.docker = {
+    enable = true;
+    autoPrune.enable = true;
+  };
+
+  # 3. SYSTEM ARCHITECTURE
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   services.mbpfan.enable = true;
 
-  # 3. NETWORKING (Broadcom Compatibility Mode)
+  # 4. NETWORKING (Broadcom Compatibility Mode)
   networking.hostName = "trashcan";
-  
   networking.networkmanager = {
     enable = true;
-    # CRITICAL: 'wl' driver requires wpa_supplicant. iwd is too modern for this card.
+    # CRITICAL: 'wl' driver requires wpa_supplicant.
     wifi.backend = "wpa_supplicant"; 
-    wifi.powersave = false; # Prevents packet loss on Broadcom chips
+    wifi.powersave = false;
   };
   
   # Disable iwd to prevent race conditions for the card
   networking.wireless.iwd.enable = false;
-
   services.tailscale.enable = true;
 
   networking.firewall = {
     enable = true;
-    trustedInterfaces = [ "tailscale0" ];
+    trustedInterfaces = [ "tailscale0" "docker0" ]; # [SEC] Trust Cluster + Containers
     allowedTCPPorts = [ 22 ];
   };
 
+  # [SEC] Hardened SSH
   services.openssh = {
     enable = true;
     settings = {
       PermitRootLogin = "no";
-      PasswordAuthentication = true;
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
     };
   };
 
-  # 4. MAINTENANCE
+  # 5. MAINTENANCE
   nix.gc = {
     automatic = true;
     dates = "weekly";
@@ -67,10 +73,14 @@
   environment.variables.VISUAL = "nvim";
   environment.shellAliases = { vim = "nvim"; vi = "nvim"; };
 
+  # 6. IDENTITY
   users.users.admin = {
     isNormalUser = true;
     description = "Node Admin";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    # [MODULAR] Keys are loaded from 'admin.keys' in the same directory.
+    # This allows users to inject keys without altering system logic.
+    openssh.authorizedKeys.keyFiles = [ ./admin.keys ];
   };
 
   time.timeZone = "UTC"; 

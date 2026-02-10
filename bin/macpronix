@@ -7,7 +7,7 @@ set -euo pipefail
 
 # -- CONFIGURATION --
 REPO_ROOT="$HOME/macpronix"
-VERSION="5.1.0"
+VERSION="5.2.0"
 
 # -- PALETTE --
 RED='\033[0;31m'
@@ -63,7 +63,8 @@ cmd_sync() {
 
     # 2. CLEANUP
     # Remove untracked files to prevent lockfile drift.
-    git clean -fd
+    # [CRITICAL] Exclude local keys to prevent lockout during SSH hardening.
+    git clean -fd -e "*.keys"
 
     # 3. VACCINE
     # Normalize line endings for Nix evaluator.
@@ -90,6 +91,14 @@ cmd_status() {
     echo -n -e "${BLUE}│${NC} CI Runner:   "
     if systemctl is-active --quiet "github-runner-trashcan-worker"; then
         echo -e "${GREEN}● ONLINE${NC}"
+    else
+        echo -e "${RED}● OFFLINE${NC}"
+    fi
+
+    echo -n -e "${BLUE}│${NC} Docker:      "
+    if systemctl is-active --quiet "docker"; then
+        CNT=$(docker ps -q 2>/dev/null | wc -l)
+        echo -e "${GREEN}● ONLINE ($CNT containers)${NC}"
     else
         echo -e "${RED}● OFFLINE${NC}"
     fi
