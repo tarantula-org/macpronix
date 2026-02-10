@@ -23,17 +23,17 @@ jobs:
             exit 1
           fi
 
-  system-integrity:
-    name: Nix Flake Verification
-    runs-on: self-hosted
-    needs: governance
-    steps:
-      - uses: actions/checkout@v4
-      
-      # [NEW] Inject Synthetic Identity for CI Context
-      # Nix requires the file to exist for evaluation, even if the content is dummy data.
-      - name: Inject CI Identity
-        run: echo 'ssh-ed25519 C1ATAAANINAADA31lCEzICA5aZ_DUMMY_KEY_FOR_CI_CHECK_ONLY ci@tarantula' > hosts/trashcan/admin.keys
-        
-      - name: Hardware Syntax Check
-        run: nix flake check --show-trace
+    system-integrity:
+        name: Nix Flake Verification
+        runs-on: self-hosted
+        needs: governance
+        steps:
+          - uses: actions/checkout@v4
+          
+          # [NEW] Inject Synthetic Identity for CI Context
+          # Creates a dummy key so Nix can evaluate the configuration purely.
+          - name: Inject CI Identity
+            run: echo 'ssh-ed25519 C1ATAAANINAADA31lCEzICA5aZ_DUMMY_KEY_FOR_CI_CHECK_ONLY ci@tarantula' > hosts/trashcan/admin.keys
+            
+          - name: Hardware Syntax Check
+            run: nix flake check --show-trace
