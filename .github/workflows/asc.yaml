@@ -30,12 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # [NEW] Inject Synthetic Identity for CI Context
       - name: Inject CI Identity
         run: |
-          # 1. Create the dummy identity file
           echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAACI_DUMMY_KEY_FOR_CI_CHECK_ONLY ci@tarantula' > hosts/trashcan/admin.keys
-          
-          # 2. [CRITICAL] Force Git to track it so Nix "sees" it
-          # The '-f' flag is required because the file is in .gitignore
           git add -f hosts/trashcan/admin.keys
+        
+      - name: Hardware Syntax Check
+        run: nix flake check --show-trace
