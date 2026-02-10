@@ -6,6 +6,7 @@ result-*
 
 # Secrets & Local State
 *.key
+*.keys
 *.pem
 secrets/
 
