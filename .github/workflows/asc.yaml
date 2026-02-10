@@ -30,10 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      # [NEW] Inject Synthetic Identity for CI Context
       - name: Inject CI Identity
-        run: |
-          echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAACI_DUMMY_KEY_FOR_CI_CHECK_ONLY ci@tarantula' > hosts/trashcan/admin.keys
-          git add -f hosts/trashcan/admin.keys
+        run: echo 'ssh-ed25519 C1ATAAANINAADA31lCEzICA5aZ_DUMMY_KEY_FOR_CI_CHECK_ONLY ci@tarantula' > hosts/trashcan/admin.keys
         
       - name: Hardware Syntax Check
         run: nix flake check --show-trace
