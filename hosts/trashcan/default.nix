@@ -15,7 +15,7 @@
     "broadcom-sta-6.30.223.271-59-6.12.67"
   ];
 
-  # 2. VIRTUALISATION [NEW]
+  # 2. VIRTUALISATION
   virtualisation.docker = {
     enable = true;
     autoPrune.enable = true;
@@ -30,7 +30,6 @@
   networking.hostName = "trashcan";
   networking.networkmanager = {
     enable = true;
-    # CRITICAL: 'wl' driver requires wpa_supplicant.
     wifi.backend = "wpa_supplicant"; 
     wifi.powersave = false;
   };
@@ -41,7 +40,7 @@
 
   networking.firewall = {
     enable = true;
-    trustedInterfaces = [ "tailscale0" "docker0" ]; # [SEC] Trust Cluster + Containers
+    trustedInterfaces = [ "tailscale0" "docker0" ];
     allowedTCPPorts = [ 22 ];
   };
 
@@ -78,9 +77,13 @@
     isNormalUser = true;
     description = "Node Admin";
     extraGroups = [ "networkmanager" "wheel" "docker" ];
-    # [MODULAR] Keys are loaded from 'admin.keys' in the same directory.
-    # This allows users to inject keys without altering system logic.
-    openssh.authorizedKeys.keyFiles = [ ./admin.keys ];
+    
+    openssh.authorizedKeys.keys = let
+      keyFile = ./admin.keys;
+    in
+      if builtins.pathExists keyFile
+      then [ (builtins.readFile keyFile) ]
+      else [];
   };
 
   time.timeZone = "UTC"; 

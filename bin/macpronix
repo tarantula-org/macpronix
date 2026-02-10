@@ -46,13 +46,10 @@ EOF
     echo ""
 }
 
-# -- CORE LOGIC --
-
 cmd_sync() {
     log_info "Initiating synchronization..."
     cd "$REPO_ROOT" || die "Repository not found at $REPO_ROOT"
 
-    # 1. FETCH & RESET
     log_info "Fetching upstream..."
     git fetch origin
 
@@ -60,22 +57,18 @@ cmd_sync() {
         die "Git reset failed. Check network."
     fi
 
-    # 2. CLEANUP
-    # Exclude local keys to prevent lockout.
     git clean -fd -e "*.keys"
 
-    # 3. [NEW] VISIBILITY HACK
-    # Force Nix to see the ignored keys by staging them as "intent-to-add".
     if [ -f "hosts/trashcan/admin.keys" ]; then
-        log_info "Exposing local identity to Nix..."
+        log_info "Identity detected. Staging for Nix..."
         git add --force --intent-to-add hosts/trashcan/admin.keys
+    else
+        die "Security Critical: 'hosts/trashcan/admin.keys' is missing.\n       Cannot deploy a locked-down system without admin keys."
     fi
 
-    # 4. VACCINE
     find . -type f -name "*.nix" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
     chmod +x bin/macpronix
 
-    # 5. DEPLOY
     log_info "Injecting hardware config and building..."
     make install
 }
