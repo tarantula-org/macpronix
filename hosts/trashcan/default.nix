@@ -15,41 +15,46 @@
     "broadcom-sta-6.30.223.271-59-6.12.67"
   ];
 
-  # 2. SYSTEM ARCHITECTURE
+  # 2. VIRTUALISATION
+  virtualisation.docker = {
+    enable = true;
+    autoPrune.enable = true;
+  };
+
+  # 3. SYSTEM ARCHITECTURE
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   services.mbpfan.enable = true;
 
-  # 3. NETWORKING (Broadcom Compatibility Mode)
+  # 4. NETWORKING (Broadcom Compatibility Mode)
   networking.hostName = "trashcan";
-  
   networking.networkmanager = {
     enable = true;
-    # CRITICAL: 'wl' driver requires wpa_supplicant. iwd is too modern for this card.
     wifi.backend = "wpa_supplicant"; 
-    wifi.powersave = false; # Prevents packet loss on Broadcom chips
+    wifi.powersave = false;
   };
   
   # Disable iwd to prevent race conditions for the card
   networking.wireless.iwd.enable = false;
-
   services.tailscale.enable = true;
 
   networking.firewall = {
     enable = true;
-    trustedInterfaces = [ "tailscale0" ];
+    trustedInterfaces = [ "tailscale0" "docker0" ];
     allowedTCPPorts = [ 22 ];
   };
 
+  # [SEC] Hardened SSH
   services.openssh = {
     enable = true;
     settings = {
       PermitRootLogin = "no";
-      PasswordAuthentication = true;
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
     };
   };
 
-  # 4. MAINTENANCE
+  # 5. MAINTENANCE
   nix.gc = {
     automatic = true;
     dates = "weekly";
@@ -67,10 +72,18 @@
   environment.variables.VISUAL = "nvim";
   environment.shellAliases = { vim = "nvim"; vi = "nvim"; };
 
+  # 6. IDENTITY
   users.users.admin = {
     isNormalUser = true;
     description = "Node Admin";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    
+    openssh.authorizedKeys.keys = let
+      keyFile = ./admin.keys;
+    in
+      if builtins.pathExists keyFile
+      then [ (builtins.readFile keyFile) ]
+      else [];
   };
 
   time.timeZone = "UTC"; 
